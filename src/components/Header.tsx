@@ -22,12 +22,6 @@ const Header = () => {
               5
             </span>
           </Button>
-          <Button variant="ghost" size="icon">
-            <LogOut className="w-5 h-5" />
-          </Button>
-          <Button variant="ghost" size="icon">
-            <Settings className="w-5 h-5" />
-          </Button>
         </div>
       </div>
     </header>
