@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Phone, Mail, MapPin } from "lucide-react";
+import { Plus, Users, Phone, Mail, MapPin, Calendar } from "lucide-react";
 import Header from "@/components/Header";
 import BottomNavigation from "@/components/BottomNavigation";
+import AddResidentModal from "@/components/AddResidentModal";
 
 const mockResidents = [
   {
@@ -51,6 +52,7 @@ const mockResidents = [
 
 const Residents = () => {
   const [filter, setFilter] = useState("all");
+  const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
 
   const filteredResidents = mockResidents.filter(resident => {
     if (filter === "all") return true;
@@ -78,34 +80,38 @@ const Residents = () => {
           <p className="text-muted-foreground mb-6">Manage your property residents</p>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-card rounded-lg p-4 border">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800 transition-all hover:shadow-lg">
               <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">12</p>
-                <p className="text-sm text-muted-foreground">Total Residents</p>
+                <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">12</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Residents</p>
               </div>
             </div>
-            <div className="bg-card rounded-lg p-4 border">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-6 border border-green-200 dark:border-green-800 transition-all hover:shadow-lg">
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">10</p>
-                <p className="text-sm text-muted-foreground">Active Leases</p>
+                <p className="text-3xl font-bold text-green-900 dark:text-green-100">10</p>
+                <p className="text-sm text-green-600 dark:text-green-400 font-medium">Active Leases</p>
               </div>
             </div>
-            <div className="bg-card rounded-lg p-4 border">
+            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-xl p-6 border border-yellow-200 dark:border-yellow-800 transition-all hover:shadow-lg">
               <div className="text-center">
-                <p className="text-2xl font-bold text-yellow-600">1</p>
-                <p className="text-sm text-muted-foreground">Notice Given</p>
+                <p className="text-3xl font-bold text-yellow-900 dark:text-yellow-100">1</p>
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">Notice Given</p>
               </div>
             </div>
-            <div className="bg-card rounded-lg p-4 border">
+            <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-6 border border-red-200 dark:border-red-800 transition-all hover:shadow-lg">
               <div className="text-center">
-                <p className="text-2xl font-bold text-red-600">1</p>
-                <p className="text-sm text-muted-foreground">Rent Overdue</p>
+                <p className="text-3xl font-bold text-red-900 dark:text-red-100">1</p>
+                <p className="text-sm text-red-600 dark:text-red-400 font-medium">Rent Overdue</p>
               </div>
             </div>
           </div>
         </div>
 
-        <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground mb-6" size="lg">
+        <Button 
+          className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground mb-6 shadow-lg transition-all hover:shadow-xl" 
+          size="lg"
+          onClick={() => setIsResidentModalOpen(true)}
+        >
           <Plus className="w-5 h-5 mr-2" />
           Add New Resident
         </Button>
@@ -143,7 +149,7 @@ const Residents = () => {
 
         <div className="space-y-4">
           {filteredResidents.map((resident) => (
-            <Card key={resident.id} className="w-full">
+            <Card key={resident.id} className="w-full hover:shadow-lg transition-all duration-200 border-l-4 border-l-primary/20">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
@@ -174,7 +180,7 @@ const Residents = () => {
                     <span className="text-sm">{resident.email}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm">Lease ends: {resident.leaseEnd}</span>
                   </div>
                 </div>
@@ -185,6 +191,10 @@ const Residents = () => {
       </main>
 
       <BottomNavigation />
+      <AddResidentModal 
+        isOpen={isResidentModalOpen} 
+        onClose={() => setIsResidentModalOpen(false)} 
+      />
     </div>
   );
 };
