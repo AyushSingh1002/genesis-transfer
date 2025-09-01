@@ -1,10 +1,14 @@
-import { BarChart3, Plus, Users, CreditCard } from "lucide-react";
+import { BarChart3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const BottomNavigation = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const navItems = [
-    { icon: BarChart3, label: "Dashboard", active: true },
-    { icon: Users, label: "Residents", active: false }
+    { icon: BarChart3, label: "Dashboard", path: "/" },
+    { icon: Users, label: "Residents", path: "/residents" }
   ];
 
   return (
@@ -16,8 +20,9 @@ const BottomNavigation = () => {
               key={item.label}
               variant="ghost"
               className={`flex flex-col items-center gap-1 py-3 h-auto ${
-                item.active ? "text-primary" : "text-muted-foreground"
+                location.pathname === item.path ? "text-primary" : "text-muted-foreground"
               }`}
+              onClick={() => navigate(item.path)}
             >
               <item.icon className="w-5 h-5" />
               <span className="text-xs">{item.label}</span>
