@@ -10,8 +10,8 @@ const Header = () => {
             <BarChart3 className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">CoLiving Manager</h1>
-            <p className="text-sm text-muted-foreground">Report and track issues</p>
+            <h1 className="text-lg font-semibold text-foreground">Owners Hub</h1>
+            <p className="text-sm text-muted-foreground">Manage your property portfolio</p>
           </div>
         </div>
         

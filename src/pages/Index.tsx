@@ -84,30 +84,23 @@ const Index = () => {
       
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Report Issue</h1>
-          <p className="text-muted-foreground mb-6">Help us improve your living experience</p>
-          
-          <div className="flex justify-end mb-6">
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Dashboard
-            </Button>
-          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Property Management</h1>
+          <p className="text-muted-foreground mb-6">Monitor and manage your rental properties</p>
         </div>
 
         <StatsCards />
 
         <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground mb-6" size="lg">
           <Plus className="w-5 h-5 mr-2" />
-          Report New Issue
+          Add New Property
         </Button>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6">
-            <TabsTrigger value="all">All Issues</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="all">All Properties</TabsTrigger>
+            <TabsTrigger value="pending">Maintenance</TabsTrigger>
             <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-            <TabsTrigger value="resolved">Resolved</TabsTrigger>
+            <TabsTrigger value="resolved">Completed</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
