@@ -53,10 +53,10 @@ const Payments = () => {
         
         return {
           id: payment.id,
-          type: Math.random() > 0.5 ? "received" : "sent", // Random for demo
-          amount: payment.amount / 100, // Convert from cents
+          type: "received",
+          amount: payment.amount, // Convert from cents
           name: payment.customer_name || "Unknown Customer",
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${payment.customer_name || payment.id}`,
+          avatar: payment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${payment.id}`,
           date: createdAt.toLocaleDateString(),
           time: createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
