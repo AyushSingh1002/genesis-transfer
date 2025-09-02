@@ -44,13 +44,9 @@
 
     /* Gradients */
     --gradient-subtle: linear-gradient(135deg, hsl(220 14% 98%), hsl(220 14% 96%));
-    --gradient-primary: linear-gradient(135deg, hsl(210 95% 55%), hsl(210 95% 65%));
-    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 46%));
-    --gradient-warning: linear-gradient(135deg, hsl(38 92% 50%), hsl(38 92% 60%));
     
     /* Transitions */
     --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-spring: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .dark {
@@ -84,9 +80,6 @@
 
     /* Dark mode gradients */
     --gradient-subtle: linear-gradient(135deg, hsl(224 71% 4%), hsl(215 27% 17%));
-    --gradient-primary: linear-gradient(135deg, hsl(210 20% 98%), hsl(210 20% 88%));
-    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 46%));
-    --gradient-warning: linear-gradient(135deg, hsl(38 92% 50%), hsl(38 92% 60%));
   }
 }
 
