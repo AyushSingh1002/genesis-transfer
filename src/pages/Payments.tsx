@@ -56,7 +56,7 @@ const Payments = () => {
           type: "received",
           amount: payment.amount, // Convert from cents
           name: payment.customer_name || "Unknown Customer",
-          avatar: payment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${payment.id}`,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${payment.id}`,
           date: createdAt.toLocaleDateString(),
           time: createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };

@@ -1,4 +1,4 @@
-import { BarChart3, Users, CreditCard } from "lucide-react";
+import { BarChart3, Users, CreditCard, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -9,13 +9,14 @@ const BottomNavigation = () => {
   const navItems = [
     { icon: BarChart3, label: "Dashboard", path: "/" },
     { icon: Users, label: "Residents", path: "/residents" },
-    { icon: CreditCard, label: "Payments", path: "/payments" }
+    { icon: CreditCard, label: "Payments", path: "/payments" },
+    { icon: Bot, label: "AI Chat", path: "/chatbot" }
   ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-4 gap-1">
           {navItems.map((item) => (
             <Button
               key={item.label}
