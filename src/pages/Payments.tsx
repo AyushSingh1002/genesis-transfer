@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -37,24 +38,17 @@ const Payments = () => {
 
   const fetchPayments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const paymentsRef = collection(db, "payments");
+      const q = query(paymentsRef, orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as any[];
 
-      if (error) {
-        console.error('Error fetching payments:', error);
-        return;
-      }
-
-      // Transform the data to match the required structure
-      const transformedPayments: PaymentDisplay[] = (data || []).map((payment: Payment) => {
-        const createdAt = new Date(payment.created_at);
-        
+      const transformedPayments: PaymentDisplay[] = (docs || []).map((payment: any) => {
+        const createdAt = payment.created_at ? new Date(payment.created_at) : new Date();
         return {
           id: payment.id,
           type: "received",
-          amount: payment.amount, // Convert from cents
+          amount: Number(payment.amount) || 0,
           name: payment.customer_name || "Unknown Customer",
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${payment.id}`,
           date: createdAt.toLocaleDateString(),

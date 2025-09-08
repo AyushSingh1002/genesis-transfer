@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/client";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import BottomNavigation from "@/components/BottomNavigation";
 
@@ -22,15 +24,17 @@ const Chatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Hello! I'm your AI assistant powered by Google Gemini. I'm here to help you with questions, provide information, assist with tasks, and have meaningful conversations. What would you like to know or discuss today?",
+      content: "Hi! I'm your Owners Hub assistant. I can answer questions about your app data (like payments) and help you navigate to sections such as Payments, Residents, or the Dashboard.",
       sender: "bot",
       timestamp: new Date(),
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentsData, setPaymentsData] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const navigate = useNavigate();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,6 +47,75 @@ const Chatbot = () => {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        const paymentsRef = collection(db, "payments");
+        const q = query(paymentsRef, orderBy("created_at", "desc"));
+        const snapshot = await getDocs(q);
+        const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+        setPaymentsData(docs);
+      } catch (err) {
+        console.error("Failed to load payments for chatbot context", err);
+      }
+    };
+    fetchPayments();
+  }, []);
+
+  const coerceDate = (value: any): Date => {
+    if (!value) return new Date(0);
+    if (typeof value === "string") return new Date(value);
+    // Firestore Timestamp
+    if (value?.toDate) return value.toDate();
+    try {
+      return new Date(value);
+    } catch {
+      return new Date(0);
+    }
+  };
+
+  const answerFromData = (question: string): string | null => {
+    const q = question.toLowerCase();
+
+    // Payments intents
+    if (q.includes("last payment") || q.includes("recent payment")) {
+      if (!paymentsData.length) return "I couldn't find any payments yet.";
+      const latest = [...paymentsData].sort((a, b) => coerceDate(b.created_at).getTime() - coerceDate(a.created_at).getTime())[0];
+      const dt = coerceDate(latest.created_at);
+      const name = latest.customer_name || "Unknown Customer";
+      const amount = Number(latest.amount) || 0;
+      return `Your most recent payment is ₹${amount.toLocaleString()} from ${name} on ${dt.toLocaleDateString()} at ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+    }
+
+    if (q.includes("how many payments") || q.includes("number of payments") || q.includes("payments count")) {
+      return `I found ${paymentsData.length} payment${paymentsData.length === 1 ? '' : 's'}.`;
+    }
+
+    if (q.includes("total paid") || q.includes("total amount") || q.includes("sum of payments") || q.includes("total revenue")) {
+      const total = paymentsData.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+      return `Your total recorded payments sum to ₹${total.toLocaleString()}.`;
+    }
+
+    if (q.includes("status")) {
+      const statusMatch = q.match(/status\s+of\s+(.*)/);
+      if (statusMatch) {
+        const name = statusMatch[1].trim();
+        const byName = paymentsData.filter(p => (p.customer_name || "").toLowerCase().includes(name));
+        if (!byName.length) return `I couldn't find payments for ${name}.`;
+        const statuses = byName.map(p => p.status || "unknown");
+        const unique = Array.from(new Set(statuses));
+        return `${name} has payment status${unique.length > 1 ? 'es' : ''}: ${unique.join(', ')}.`;
+      }
+    }
+
+    // Help intent
+    if (q.includes("help") || q.includes("what can you do") || q.includes("how do i")) {
+      return "I can answer questions about your payments, like: 'last payment', 'how many payments', 'total paid', or 'status of <customer>'.";
+    }
+
+    return null;
+  };
 
   const clearChat = () => {
     setMessages([
@@ -80,15 +153,12 @@ const Chatbot = () => {
     }, 300);
 
     try {
-      const { data, error } = await supabase.functions.invoke("gemini-chat", {
-        body: { message: inputMessage },
-      });
-
-      if (error) throw error;
+      const dataAnswer = answerFromData(inputMessage);
+      const responseText = dataAnswer ?? "I can help with your account data. Try asking: 'last payment', 'how many payments', 'total paid', or 'status of <customer>'.";
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: data.response || "Sorry, I couldn't process that request.",
+        content: responseText,
         sender: "bot",
         timestamp: new Date(),
         isAnimating: true,
@@ -96,19 +166,16 @@ const Chatbot = () => {
 
       setMessages((prev) => [...prev, botMessage]);
 
-      // Remove animation class after animation completes
       setTimeout(() => {
         setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === botMessage.id ? { ...msg, isAnimating: false } : msg
-          )
+          prev.map((msg) => (msg.id === botMessage.id ? { ...msg, isAnimating: false } : msg))
         );
       }, 300);
     } catch (error) {
       console.error("Error sending message:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "Sorry, I'm having trouble connecting right now. Please try again later.",
+        content: "Sorry, I hit an unexpected error. Please try again.",
         sender: "bot",
         timestamp: new Date(),
       };
@@ -137,11 +204,37 @@ const Chatbot = () => {
   };
 
   const suggestedQuestions = [
-    "What can you help me with?",
-    "Tell me about the latest technology trends",
-    "Help me write a professional email",
-    "Explain quantum computing simply"
+    "Show my latest payment",
+    "How many payments are recorded?",
+    "What is the total amount collected?",
+    "What is the status of John Smith's payment?",
+    "Open Payments",
+    "Open Residents",
+    "Open Dashboard"
   ];
+
+  const maybeNavigate = (text: string): boolean => {
+    const q = text.toLowerCase();
+    if (q.includes("open payments") || q.includes("go to payments") || q.includes("navigate to payments")) {
+      navigate("/payments");
+      return true;
+    }
+    if (q.includes("open residents") || q.includes("go to residents") || q.includes("navigate to residents")) {
+      navigate("/residents");
+      return true;
+    }
+    if (q.includes("open dashboard") || q.includes("go to dashboard") || q.includes("navigate to dashboard")) {
+      navigate("/");
+      return true;
+    }
+    return false;
+  };
+
+  const handleSuggestionClick = (text: string) => {
+    if (!maybeNavigate(text)) {
+      setInputMessage(text);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-20">
@@ -276,14 +369,14 @@ const Chatbot = () => {
             {/* Suggested Questions (show when chat is empty) */}
             {messages.length === 1 && !isLoading && (
               <div className="p-6 border-t border-border/50">
-                <p className="text-sm text-muted-foreground mb-3">Try asking:</p>
+                <p className="text-sm text-muted-foreground mb-3">Try these app-specific prompts or quick actions:</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {suggestedQuestions.map((question, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       size="sm"
-                      onClick={() => setInputMessage(question)}
+                      onClick={() => handleSuggestionClick(question)}
                       className="justify-start h-auto py-2 px-3 text-left whitespace-normal hover:bg-muted/50"
                     >
                       {question}
