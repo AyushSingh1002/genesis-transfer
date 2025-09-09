@@ -1,7 +1,10 @@
 import { Bell, BarChart3, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const Header = () => {
+  const navigate = useNavigate();
+
   return (
     <header className="bg-background border-b border-border px-4 py-3">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -21,6 +24,13 @@ const Header = () => {
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs rounded-full flex items-center justify-center">
               5
             </span>
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => navigate('/settings')}
+          >
+            <Settings className="w-5 h-5" />
           </Button>
         </div>
       </div>

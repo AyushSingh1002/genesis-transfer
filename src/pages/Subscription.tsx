@@ -1,0 +1,249 @@
+import { useState } from "react";
+import { Check, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { db } from "@/integrations/firebase/client";
+import { collection, addDoc } from "firebase/firestore";
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
+
+const Subscription = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const plans = [
+    {
+      name: "Free",
+      price: 0,
+      period: "month",
+      description: "Perfect for getting started",
+      features: [
+        "Up to 5 properties",
+        "Basic reporting",
+        "Email support",
+        "Mobile app access"
+      ],
+      popular: false,
+      buttonText: "Current Plan"
+    },
+    {
+      name: "Pro",
+      price: 999,
+      period: "month",
+      description: "For growing property portfolios",
+      features: [
+        "Unlimited properties",
+        "Advanced analytics",
+        "Priority support",
+        "Custom integrations",
+        "Bulk operations",
+        "API access"
+      ],
+      popular: true,
+      buttonText: "Upgrade to Pro"
+    },
+    {
+      name: "Enterprise",
+      price: 2999,
+      period: "month",
+      description: "For large-scale operations",
+      features: [
+        "Everything in Pro",
+        "White-label solution",
+        "Dedicated account manager",
+        "Custom features",
+        "SLA guarantee",
+        "On-premise deployment"
+      ],
+      popular: false,
+      buttonText: "Contact Sales"
+    }
+  ];
+
+  const handlePayment = async (plan: typeof plans[0]) => {
+    if (plan.price === 0) {
+      toast({
+        title: "Already on Free Plan",
+        description: "You're currently on the free plan.",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Load Razorpay script
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      document.body.appendChild(script);
+
+      script.onload = () => {
+        const options = {
+          key: 'rzp_test_9999999999999999', // Replace with your Razorpay key
+          amount: plan.price * 100, // Amount in paise
+          currency: 'INR',
+          name: 'Owners Hub',
+          description: `${plan.name} Plan Subscription`,
+          image: '/favicon.ico',
+          handler: async function (response: any) {
+            try {
+              // Store subscription details in Firebase Firestore
+              await addDoc(collection(db, 'subscriptions'), {
+                payment_id: response.razorpay_payment_id,
+                plan: plan.name,
+                amount: plan.price,
+                currency: 'INR',
+                status: 'paid',
+                date: new Date().toISOString(),
+                user_email: 'user@example.com', // Replace with actual user email
+                user_id: 'user123', // Replace with actual user ID
+                features: plan.features,
+                period: plan.period
+              });
+
+              toast({
+                title: "Payment Successful!",
+                description: `Successfully subscribed to ${plan.name} plan.`,
+              });
+
+              // Navigate back to settings
+              setTimeout(() => {
+                navigate('/settings');
+              }, 2000);
+            } catch (error) {
+              console.error('Error storing subscription:', error);
+              toast({
+                title: "Payment Processed",
+                description: "Payment successful but there was an issue storing details.",
+                variant: "destructive"
+              });
+            }
+          },
+          prefill: {
+            name: 'John Doe',
+            email: 'user@example.com',
+            contact: '9999999999'
+          },
+          notes: {
+            plan: plan.name,
+            period: plan.period
+          },
+          theme: {
+            color: '#3b82f6'
+          },
+          modal: {
+            ondismiss: function() {
+              setLoading(false);
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+        setLoading(false);
+      };
+
+      script.onerror = () => {
+        toast({
+          title: "Error",
+          description: "Failed to load payment gateway. Please try again.",
+          variant: "destructive"
+        });
+        setLoading(false);
+      };
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast({
+        title: "Payment Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="bg-background border-b border-border px-4 py-3">
+        <div className="flex items-center gap-3 max-w-7xl mx-auto">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Subscription Plans</h1>
+            <p className="text-sm text-muted-foreground">Choose the plan that fits your needs</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-foreground mb-4">
+            Choose Your Plan
+          </h2>
+          <p className="text-muted-foreground text-lg">
+            Unlock powerful features to manage your property portfolio
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          {plans.map((plan, index) => (
+            <Card key={index} className={`relative ${plan.popular ? 'border-primary shadow-lg scale-105' : ''}`}>
+              {plan.popular && (
+                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
+                  Most Popular
+                </Badge>
+              )}
+              
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
+                <CardDescription className="text-base">{plan.description}</CardDescription>
+                <div className="mt-4">
+                  <span className="text-4xl font-bold text-foreground">₹{plan.price}</span>
+                  {plan.price > 0 && <span className="text-muted-foreground">/{plan.period}</span>}
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-6">
+                <ul className="space-y-3">
+                  {plan.features.map((feature, featureIndex) => (
+                    <li key={featureIndex} className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-success shrink-0" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button 
+                  className="w-full" 
+                  variant={plan.popular ? "default" : "outline"}
+                  onClick={() => handlePayment(plan)}
+                  disabled={loading || plan.price === 0}
+                >
+                  {loading ? "Processing..." : plan.buttonText}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <p className="text-muted-foreground">
+            All plans include a 14-day free trial. Cancel anytime.
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default Subscription;

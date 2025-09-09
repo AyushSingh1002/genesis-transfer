@@ -7,6 +7,8 @@ import Dashboard from "./pages/Dashboard";
 import Residents from "./pages/Residents";
 import Payments from "./pages/Payments";
 import Chatbot from "./pages/Chatbot";
+import Settings from "./pages/Settings";
+import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +24,8 @@ const App = () => (
           <Route path="/residents" element={<Residents />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/chatbot" element={<Chatbot />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/subscription" element={<Subscription />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
