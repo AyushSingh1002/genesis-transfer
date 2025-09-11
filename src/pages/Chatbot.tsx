@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Loader2, Bot, User, Sparkles, MessageCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/integrations/firebase/client";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, limit, where } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import BottomNavigation from "@/components/BottomNavigation";
@@ -20,6 +20,11 @@ interface Message {
   timestamp: Date;
   isAnimating?: boolean;
 }
+
+// Cache for Firebase data to minimize redundant fetches
+let paymentsCache: any[] = [];
+let lastFetchTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const Chatbot = () => {
   const { user, userProfile, isGuest } = useAuth();
@@ -50,20 +55,53 @@ const Chatbot = () => {
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const paymentsRef = collection(db, "payments");
-        const q = query(paymentsRef, orderBy("created_at", "desc"));
-        const snapshot = await getDocs(q);
-        const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
-        setPaymentsData(docs);
-      } catch (err) {
-        console.error("Failed to load payments for chatbot context", err);
-      }
-    };
-    fetchPayments();
+  // Optimized data fetching with caching
+  const fetchPayments = useCallback(async (forceRefresh = false) => {
+    const now = Date.now();
+    
+    // Use cache if it's still valid
+    if (!forceRefresh && paymentsCache.length > 0 && now - lastFetchTime < CACHE_DURATION) {
+      setPaymentsData(paymentsCache);
+      return;
+    }
+
+    try {
+      const paymentsRef = collection(db, "payments");
+      // Limit the data fetched to only what's needed for common queries
+      const q = query(
+        paymentsRef, 
+        orderBy("created_at", "desc"),
+        limit(50) // Limit to most recent 50 payments for chatbot context
+      );
+      const snapshot = await getDocs(q);
+      const docs = snapshot.docs.map((doc) => ({ 
+        id: doc.id, 
+        customer_name: doc.data().customer_name,
+        amount: doc.data().amount,
+        status: doc.data().status,
+        created_at: doc.data().created_at
+      }));
+      
+      // Update cache
+      paymentsCache = docs;
+      lastFetchTime = now;
+      setPaymentsData(docs);
+    } catch (err) {
+      console.error("Failed to load payments for chatbot context", err);
+    }
   }, []);
+
+  // Fetch data only when needed (when user asks a payment-related question)
+  const fetchDataIfNeeded = useCallback(async (question: string) => {
+    const paymentKeywords = ["payment", "payments", "paid", "revenue", "amount"];
+    const hasPaymentQuery = paymentKeywords.some(keyword => 
+      question.toLowerCase().includes(keyword)
+    );
+    
+    if (hasPaymentQuery) {
+      await fetchPayments();
+    }
+  }, [fetchPayments]);
 
   const coerceDate = (value: any): Date => {
     if (!value) return new Date(0);
@@ -78,28 +116,45 @@ const Chatbot = () => {
   };
 
   const getAIResponse = async (question: string): Promise<string> => {
+    // Check for navigation commands first
+    if (maybeNavigate(question)) {
+      return "Taking you there now...";
+    }
+
+    // Check if we can answer from local data first
     try {
-      // First check for data-specific queries
+      await fetchDataIfNeeded(question);
       const dataAnswer = answerFromData(question);
       if (dataAnswer) {
         return dataAnswer;
       }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
 
-      // Use Gemini AI for general conversation
-      const response = await fetch('https://qtglsxsscxqpividdfsj.supabase.co/functions/v1/gemini-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Context: You are a helpful property management assistant for CoHub. 
-            ${isGuest ? 'The user is browsing as a guest with limited access.' : `The user's name is ${userProfile?.fullName || 'User'}.`}
-            You help with property management, maintenance requests, payments, and resident services.
-            Keep responses helpful, concise, and friendly.
-            
-            User question: ${question}`
-        }),
-      });
+    // For general questions, use AI with optimized token usage
+    try {
+      // Create a concise context message to save tokens
+const contextMessage = `You are a helpful property management assistant for CoHub. 
+  ${isGuest ? 'Guest user.' : `User: ${userProfile?.fullName || 'User'}.`}
+  Help with property management, maintenance, payments, and resident services.
+  Keep responses concise and helpful.`;
+
+const response = await fetch('https://qtglsxsscxqpividdfsj.supabase.co/functions/v1/gemini-chat', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    message: `${contextMessage}
+    
+    Here is some recent payments data from Firebase: 
+    ${JSON.stringify(paymentsData, null, 2)}
+
+    Question: ${question}`
+  }),
+});
+
 
       if (!response.ok) {
         throw new Error('AI service unavailable');
@@ -109,7 +164,7 @@ const Chatbot = () => {
       return data.response || "I'm here to help with your property management needs!";
     } catch (error) {
       console.error('AI Error:', error);
-      return "I'm having trouble connecting to my AI brain right now, but I can still help with basic queries about your data!";
+      return "I'm having trouble connecting right now, but I can still help with basic data queries!";
     }
   };
 
@@ -117,22 +172,22 @@ const Chatbot = () => {
     const q = question.toLowerCase();
 
     // Payments intents
-    if (q.includes("last payment") || q.includes("recent payment")) {
+    if (q.includes("last payment") || q.includes("recent payment") || q.includes("latest payment")) {
       if (!paymentsData.length) return "I couldn't find any payments yet.";
-      const latest = [...paymentsData].sort((a, b) => coerceDate(b.created_at).getTime() - coerceDate(a.created_at).getTime())[0];
+      const latest = paymentsData[0]; // Already sorted by date
       const dt = coerceDate(latest.created_at);
       const name = latest.customer_name || "Unknown Customer";
       const amount = Number(latest.amount) || 0;
-      return `Your most recent payment is ₹${amount.toLocaleString()} from ${name} on ${dt.toLocaleDateString()} at ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+      return `Most recent payment: ₹${amount.toLocaleString()} from ${name} on ${dt.toLocaleDateString()}.`;
     }
 
     if (q.includes("how many payments") || q.includes("number of payments") || q.includes("payments count")) {
-      return `I found ${paymentsData.length} payment${paymentsData.length === 1 ? '' : 's'}.`;
+      return `Found ${paymentsData.length} payment${paymentsData.length === 1 ? '' : 's'}.`;
     }
 
     if (q.includes("total paid") || q.includes("total amount") || q.includes("sum of payments") || q.includes("total revenue")) {
       const total = paymentsData.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-      return `Your total recorded payments sum to ₹${total.toLocaleString()}.`;
+      return `Total payments: ₹${total.toLocaleString()}.`;
     }
 
     if (q.includes("status")) {
@@ -140,10 +195,10 @@ const Chatbot = () => {
       if (statusMatch) {
         const name = statusMatch[1].trim();
         const byName = paymentsData.filter(p => (p.customer_name || "").toLowerCase().includes(name));
-        if (!byName.length) return `I couldn't find payments for ${name}.`;
+        if (!byName.length) return `No payments found for ${name}.`;
         const statuses = byName.map(p => p.status || "unknown");
         const unique = Array.from(new Set(statuses));
-        return `${name} has payment status${unique.length > 1 ? 'es' : ''}: ${unique.join(', ')}.`;
+        return `${name}'s payment status: ${unique.join(', ')}.`;
       }
     }
 
@@ -162,7 +217,7 @@ const Chatbot = () => {
   };
 
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+    if (!inputMessage.trim() || isLoading || inputMessage.length > 2000) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -207,7 +262,7 @@ const Chatbot = () => {
       console.error("Error sending message:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "Sorry, I hit an unexpected error. Please try again.",
+        content: "Sorry, I encountered an error. Please try again.",
         sender: "bot",
         timestamp: new Date(),
       };
