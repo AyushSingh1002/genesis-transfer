@@ -11,6 +11,7 @@ import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import BottomNavigation from "@/components/BottomNavigation";
+import { useAuth } from "@/context/AuthContext";
 
 interface Message {
   id: string;
@@ -21,10 +22,11 @@ interface Message {
 }
 
 const Chatbot = () => {
+  const { user, userProfile, isGuest } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Hi! I'm your Owners Hub assistant. I can answer questions about your app data (like payments) and help you navigate to sections such as Payments, Residents, or the Dashboard.",
+      content: `Hi${isGuest ? '' : `, ${userProfile?.fullName || 'there'}`}! I'm your Owners Hub assistant. I can answer questions about your app data (like payments) and help you navigate to sections such as Payments, Residents, or the Dashboard.${isGuest ? ' Note: You\'re browsing as a guest with limited access.' : ''}`,
       sender: "bot",
       timestamp: new Date(),
     },
@@ -121,7 +123,7 @@ const Chatbot = () => {
     setMessages([
       {
         id: "1",
-        content: "Hello! I'm your AI assistant powered by Google Gemini. I'm here to help you with questions, provide information, assist with tasks, and have meaningful conversations. What would you like to know or discuss today?",
+        content: `Hi${isGuest ? '' : `, ${userProfile?.fullName || 'there'}`}! I'm your Owners Hub assistant. I can answer questions about your app data (like payments) and help you navigate to sections such as Payments, Residents, or the Dashboard.${isGuest ? ' Note: You\'re browsing as a guest with limited access.' : ''}`,
         sender: "bot",
         timestamp: new Date(),
       },
@@ -154,7 +156,9 @@ const Chatbot = () => {
 
     try {
       const dataAnswer = answerFromData(inputMessage);
-      const responseText = dataAnswer ?? "I can help with your account data. Try asking: 'last payment', 'how many payments', 'total paid', or 'status of <customer>'.";
+      const responseText = dataAnswer ?? (isGuest ? 
+        "As a guest, you have limited access. For personalized assistance and full features, please create an account!" :
+        `I can help with your account data${userProfile?.fullName ? `, ${userProfile.fullName}` : ''}. Try asking: 'last payment', 'how many payments', 'total paid', or 'status of <customer>'.`);
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -203,7 +207,14 @@ const Chatbot = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const suggestedQuestions = [
+  const suggestedQuestions = isGuest ? [
+    "What features does CoHub offer?",
+    "How do I create an account?",
+    "What are the benefits of signing up?",
+    "Open Dashboard",
+    "Open Residents",
+    "Open Payments"
+  ] : [
     "Show my latest payment",
     "How many payments are recorded?",
     "What is the total amount collected?",
