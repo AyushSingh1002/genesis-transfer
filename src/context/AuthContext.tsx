@@ -42,26 +42,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Add error boundary for auth state
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const isGuest = user?.isAnonymous || false;
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      
-      if (user && !user.isAnonymous) {
-        // Fetch user profile for registered users
-        const profileDoc = await getDoc(doc(db, 'users', user.uid));
-        if (profileDoc.exists()) {
-          setUserProfile(profileDoc.data() as UserProfile);
+    try {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        setUser(user);
+        
+        if (user && !user.isAnonymous) {
+          // Fetch user profile for registered users
+          const profileDoc = await getDoc(doc(db, 'users', user.uid));
+          if (profileDoc.exists()) {
+            setUserProfile(profileDoc.data() as UserProfile);
+          }
+        } else {
+          setUserProfile(null);
         }
-      } else {
-        setUserProfile(null);
-      }
-      
-      setLoading(false);
-    });
+        
+        setLoading(false);
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    } catch (error) {
+      console.error('Auth error:', error);
+      setAuthError('Authentication failed to initialize');
+      setLoading(false);
+    }
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -90,6 +99,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signOut(auth);
     setUserProfile(null);
   };
+
+  // If there's an auth error, show a fallback
+  if (authError) {
+    return <div>Authentication Error: {authError}</div>;
+  }
 
   const value = {
     user,
