@@ -5,7 +5,8 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  signInAnonymously
+  signInAnonymously,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '@/integrations/firebase/client';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -14,10 +15,11 @@ interface AuthContextType {
   user: User | null;
   isGuest: boolean;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, role?: 'owner' | 'resident') => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   userProfile: UserProfile | null;
 }
 
@@ -25,6 +27,7 @@ interface UserProfile {
   fullName: string;
   email: string;
   createdAt: string;
+  role?: 'owner' | 'resident' | 'guest';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,13 +76,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, role: 'owner' | 'resident' = 'resident') => {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
     
     // Create user profile in Firestore
     const userProfile = {
       fullName,
       email,
+      role,
       createdAt: new Date().toISOString(),
     };
     
@@ -93,6 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInAsGuest = async () => {
     await signInAnonymously(auth);
+  };
+
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
   };
 
   const logout = async () => {
@@ -112,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signIn,
     signInAsGuest,
+    resetPassword,
     logout,
     userProfile,
   };
