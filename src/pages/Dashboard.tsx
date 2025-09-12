@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, TrendingUp, Users, Home, Activity } from "lucide-react";
@@ -7,6 +7,13 @@ import StatsCards from "@/components/StatsCards";
 import IssueCard from "@/components/IssueCard";
 import BottomNavigation from "@/components/BottomNavigation";
 import AddPropertyModal from "@/components/AddPropertyModal";
+import { useAuth } from "@/context/AuthContext";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+);
 
 type Status = "pending" | "in-progress" | "resolved";
 
@@ -49,8 +56,70 @@ const mockIssues = [
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
+  const [issues, setIssues] = useState(mockIssues);
+  const [loading, setLoading] = useState(false);
+  const { userProfile, isGuest } = useAuth();
 
-  const filteredIssues = mockIssues.filter(issue => {
+  const isOwner = userProfile?.role === 'owner' || isGuest;
+
+  // Fetch real issues from Supabase
+  useEffect(() => {
+    fetchIssues();
+  }, []);
+
+  const fetchIssues = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('issues')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (data) {
+        // Transform Supabase data to match our interface
+        const transformedIssues = data.map(issue => ({
+          id: issue.id,
+          title: issue.title,
+          priority: issue.priority,
+          reporter: issue.submitted_by,
+          date: new Date(issue.created_at).toLocaleDateString(),
+          unit: issue.unit || 'N/A',
+          description: issue.description,
+          category: issue.category,
+          status: issue.status
+        }));
+        setIssues(transformedIssues);
+      }
+    } catch (error) {
+      console.error('Error fetching issues:', error);
+      // Fall back to mock data if there's an error
+      setIssues(mockIssues);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateIssueStatus = async (issueId: string, newStatus: Status) => {
+    try {
+      const { error } = await supabase
+        .from('issues')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', issueId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setIssues(prev => prev.map(issue => 
+        issue.id === issueId ? { ...issue, status: newStatus } : issue
+      ));
+    } catch (error) {
+      console.error('Error updating issue status:', error);
+    }
+  };
+
+  const filteredIssues = issues.filter(issue => {
     if (activeTab === "all") return true;
     if (activeTab === "pending") return issue.status === "pending";
     if (activeTab === "in-progress") return issue.status === "in-progress";
@@ -64,8 +133,15 @@ const Dashboard = () => {
       
       <main className="max-w-7xl mx-auto px-4 py-6">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Property Dashboard</h1>
-          <p className="text-muted-foreground mb-6">Overview of your rental properties</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            {isOwner ? 'Owner Dashboard' : 'Resident Dashboard'}
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            {isOwner 
+              ? 'Manage your rental properties and tenant issues' 
+              : 'View your rental information and submit requests'
+            }
+          </p>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800 transition-all hover:shadow-lg">
@@ -120,14 +196,16 @@ const Dashboard = () => {
 
         <StatsCards />
 
-        <Button 
-          className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground mb-6 shadow-lg transition-all hover:shadow-xl" 
-          size="lg"
-          onClick={() => setIsPropertyModalOpen(true)}
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add New Property
-        </Button>
+        {isOwner && (
+          <Button 
+            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground mb-6 shadow-lg transition-all hover:shadow-xl" 
+            size="lg"
+            onClick={() => setIsPropertyModalOpen(true)}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add New Property
+          </Button>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6">
@@ -138,18 +216,34 @@ const Dashboard = () => {
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
-            {filteredIssues.map((issue) => (
-              <IssueCard key={issue.id} issue={issue} />
-            ))}
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="text-muted-foreground">Loading issues...</div>
+              </div>
+            ) : filteredIssues.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-muted-foreground">No issues found.</div>
+              </div>
+            ) : (
+              filteredIssues.map((issue) => (
+                <IssueCard 
+                  key={issue.id} 
+                  issue={issue} 
+                  onStatusChange={isOwner ? updateIssueStatus : undefined}
+                />
+              ))
+            )}
           </TabsContent>
         </Tabs>
       </main>
 
       <BottomNavigation />
-      <AddPropertyModal 
-        isOpen={isPropertyModalOpen} 
-        onClose={() => setIsPropertyModalOpen(false)} 
-      />
+      {isOwner && (
+        <AddPropertyModal 
+          isOpen={isPropertyModalOpen} 
+          onClose={() => setIsPropertyModalOpen(false)} 
+        />
+      )}
     </div>
   );
 };

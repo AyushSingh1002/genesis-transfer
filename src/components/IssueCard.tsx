@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, User, Calendar, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, User, Calendar, MapPin, CheckCircle, Clock, Play } from "lucide-react";
 
 interface Issue {
   id: string;
@@ -16,6 +17,7 @@ interface Issue {
 
 interface IssueCardProps {
   issue: Issue;
+  onStatusChange?: (issueId: string, newStatus: "pending" | "in-progress" | "resolved") => void;
 }
 
 const priorityColors = {
@@ -30,7 +32,32 @@ const statusColors = {
   resolved: "bg-green-100 text-green-800 border-green-200"
 };
 
-const IssueCard = ({ issue }: IssueCardProps) => {
+const IssueCard = ({ issue, onStatusChange }: IssueCardProps) => {
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return <Clock className="w-4 h-4" />;
+      case 'in-progress': return <Play className="w-4 h-4" />;
+      case 'resolved': return <CheckCircle className="w-4 h-4" />;
+      default: return <Clock className="w-4 h-4" />;
+    }
+  };
+
+  const getNextStatus = (currentStatus: string) => {
+    switch (currentStatus) {
+      case 'pending': return 'in-progress';
+      case 'in-progress': return 'resolved';
+      default: return 'pending';
+    }
+  };
+
+  const getStatusActionText = (currentStatus: string) => {
+    switch (currentStatus) {
+      case 'pending': return 'Start Work';
+      case 'in-progress': return 'Mark Resolved';
+      case 'resolved': return 'Reopen';
+      default: return 'Update Status';
+    }
+  };
   return (
     <Card className="border border-border hover:shadow-md transition-shadow">
       <CardContent className="p-4">
@@ -65,9 +92,32 @@ const IssueCard = ({ issue }: IssueCardProps) => {
           <Badge variant="outline" className="text-xs">
             {issue.category}
           </Badge>
-          <Badge className={statusColors[issue.status]}>
-            {issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={statusColors[issue.status]}>
+              <div className="flex items-center gap-1">
+                {getStatusIcon(issue.status)}
+                {issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
+              </div>
+            </Badge>
+            {onStatusChange && issue.status !== 'resolved' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onStatusChange(issue.id, getNextStatus(issue.status) as "pending" | "in-progress" | "resolved")}
+              >
+                {getStatusActionText(issue.status)}
+              </Button>
+            )}
+            {onStatusChange && issue.status === 'resolved' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onStatusChange(issue.id, 'pending')}
+              >
+                Reopen
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -11,17 +11,21 @@ import { Loader2, Home, UserPlus, LogIn, Users } from 'lucide-react';
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
   const [signUpData, setSignUpData] = useState({
     fullName: '',
     email: '',
     password: '',
+    role: 'resident' as 'owner' | 'resident',
   });
   const [signInData, setSignInData] = useState({
     email: '',
     password: '',
   });
   
-  const { signUp, signIn, signInAsGuest } = useAuth();
+  const { signUp, signIn, signInAsGuest, resetPassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -30,10 +34,10 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      await signUp(signUpData.email, signUpData.password, signUpData.fullName);
+      await signUp(signUpData.email, signUpData.password, signUpData.fullName, signUpData.role);
       toast({
         title: "Account created!",
-        description: "Welcome to CoHub! Your account has been created successfully.",
+        description: `Welcome to CoHub! Your ${signUpData.role} account has been created successfully.`,
       });
       navigate('/');
     } catch (error: any) {
@@ -89,6 +93,105 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      await resetPassword(resetEmail);
+      setResetEmailSent(true);
+      toast({
+        title: "Password reset email sent!",
+        description: "Check your email for instructions to reset your password.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Reset failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (showForgotPassword) {
+    if (resetEmailSent) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <CardTitle>Email Sent!</CardTitle>
+              <CardDescription>
+                We've sent a password reset link to your email address.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button 
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setResetEmailSent(false);
+                  setResetEmail('');
+                }}
+                className="w-full"
+              >
+                Back to Login
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Reset Password</CardTitle>
+            <CardDescription>
+              Enter your email address and we'll send you a reset link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isLoading} className="flex-1">
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Reset Email'
+                  )}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowForgotPassword(false)}
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
@@ -161,6 +264,14 @@ const Auth = () => {
                       'Sign In'
                     )}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full"
+                    onClick={() => setShowForgotPassword(true)}
+                  >
+                    Forgot Password?
+                  </Button>
                 </form>
               </CardContent>
             </Card>
@@ -208,6 +319,18 @@ const Auth = () => {
                       onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
                       required
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-role">Account Type</Label>
+                    <select
+                      id="signup-role"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={signUpData.role}
+                      onChange={(e) => setSignUpData({ ...signUpData, role: e.target.value as 'owner' | 'resident' })}
+                    >
+                      <option value="resident">Resident</option>
+                      <option value="owner">Property Owner</option>
+                    </select>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
