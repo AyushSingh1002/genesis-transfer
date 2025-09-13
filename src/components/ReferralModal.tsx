@@ -7,12 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Copy, Share2, Users, Gift, CheckCircle, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
 
 interface ReferralModalProps {
   isOpen: boolean;
@@ -29,11 +25,20 @@ const ReferralModal = ({ isOpen, onClose }: ReferralModalProps) => {
   const [referralData, setReferralData] = useState<ReferralData | null>(null);
   const [loading, setLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const baseUrl = window.location.origin;
   const referralLink = referralData ? `${baseUrl}/auth?ref=${referralData.referral_code}` : '';
+
+  // Function to generate a valid UUID v4
+  const generateValidUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
 
   useEffect(() => {
     if (isOpen && user) {
@@ -46,34 +51,41 @@ const ReferralModal = ({ isOpen, onClose }: ReferralModalProps) => {
     
     setLoading(true);
     try {
-      // First try to get existing referral
-      const { data: existingReferral, error: fetchError } = await supabase
-        .from('referrals')
-        .select('*')
-        .eq('user_id', user.uid)
-        .single();
-
-      if (existingReferral) {
-        setReferralData(existingReferral);
-      } else if (fetchError?.code === 'PGRST116') {
-        // No referral exists, create one
-        const { data: newReferral, error: createError } = await supabase.rpc('generate_referral_code');
-        
-        if (createError) throw createError;
-
-        const { data: insertedReferral, error: insertError } = await supabase
-          .from('referrals')
-          .insert([{
-            user_id: user.uid,
-            referral_code: newReferral
-          }])
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        setReferralData(insertedReferral);
+      // Check if user already has a referral code
+      const userRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists() && userDoc.data().referralCode) {
+        // User already has a referral code
+        setReferralData({
+          id: user.uid,
+          referral_code: userDoc.data().referralCode,
+          created_at: userDoc.data().referralCreatedAt || new Date().toISOString()
+        });
       } else {
-        throw fetchError;
+        // Generate a new referral code
+        const referralCode = generateValidUUID();
+        
+        // Update user document with referral code
+        await setDoc(userRef, {
+          referralCode: referralCode,
+          referralCreatedAt: new Date().toISOString()
+        }, { merge: true });
+        
+        // Also create a record in the referrals collection
+        const referralRef = doc(collection(db, "referrals"));
+        await setDoc(referralRef, {
+          user_id: user.uid,
+          referral_code: referralCode,
+          created_at: new Date().toISOString(),
+          uses: 0
+        });
+        
+        setReferralData({
+          id: referralRef.id,
+          referral_code: referralCode,
+          created_at: new Date().toISOString()
+        });
       }
     } catch (error) {
       console.error('Error with referral:', error);
