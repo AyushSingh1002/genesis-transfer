@@ -118,28 +118,25 @@ const Chatbot = () => {
         return dataAnswer;
       }
 
-      // Use Gemini AI for general conversation
-      const response = await fetch('https://qtglsxsscxqpividdfsj.supabase.co/functions/v1/gemini-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Context: You are a helpful property management assistant for CoHub. 
-            ${isGuest ? 'The user is browsing as a guest with limited access.' : `The user's name is ${userProfile?.fullName || 'User'}.`}
-            You help with property management, maintenance requests, payments, and resident services.
-            Keep responses helpful, concise, and friendly.
-            
-            User question: ${question}`
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('AI service unavailable');
+      // Use a simple rule-based response system for general conversation
+      // This can be replaced with a direct Gemini API call if you have an API key
+      const responses = [
+        "I'm here to help with your property management needs!",
+        "You can ask me about payments, residents, or navigate to different sections.",
+        "I can help you understand your property data and answer questions about the app.",
+        "Feel free to ask about any features of CoHub - I'm here to assist!",
+        "I can provide information about your dashboard, residents, and payment history."
+      ];
+      
+      // Return a contextual response based on the question
+      if (question.toLowerCase().includes('help')) {
+        return "I can help you with property management tasks. Try asking about payments, residents, or use the navigation suggestions below.";
       }
-
-      const data = await response.json();
-      return data.response || "I'm here to help with your property management needs!";
+      if (question.toLowerCase().includes('feature')) {
+        return "CoHub offers resident management, payment tracking, issue reporting, and a comprehensive dashboard for property owners.";
+      }
+      
+      return responses[Math.floor(Math.random() * responses.length)];
     } catch (error) {
       console.error('AI Error:', error);
       return "I'm having trouble connecting to my AI brain right now, but I can still help with basic queries about your data!";
