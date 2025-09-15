@@ -110,15 +110,24 @@ const Chatbot = () => {
     }
   };
 
-  const getAIResponse = async (question: string): Promise<string> => {
-    try {
-      // First check for data-specific queries
-      const dataAnswer = answerFromData(question);
-      if (dataAnswer) {
-        return dataAnswer;
-      }
+const getAIResponse = async (question: string): Promise<string> => {
+  try {
+    // First check for data-specific queries
+    const dataAnswer = answerFromData(question);
+    if (dataAnswer) {
+      return dataAnswer;
+    }
 
-      // Use Gemini AI for general conversation
+    // Check if we should navigate instead of getting AI response
+    if (maybeNavigate(question)) {
+      return "Taking you there now...";
+    }
+
+    // Use Gemini AI for general conversation - with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    try {
       const response = await fetch('https://qtglsxsscxqpividdfsj.supabase.co/functions/v1/gemini-chat', {
         method: 'POST',
         headers: {
@@ -132,19 +141,32 @@ const Chatbot = () => {
             
             User question: ${question}`
         }),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error('AI service unavailable');
+        throw new Error(`AI service responded with status: ${response.status}`);
       }
 
       const data = await response.json();
       return data.response || "I'm here to help with your property management needs!";
-    } catch (error) {
-      console.error('AI Error:', error);
-      return "I'm having trouble connecting to my AI brain right now, but I can still help with basic queries about your data!";
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
     }
-  };
+  } catch (error) {
+    console.error('AI Error:', error);
+    
+    // Provide helpful fallback responses based on error type
+    if (error.name === 'AbortError') {
+      return "I'm taking a bit too long to respond. Please try again in a moment, or ask me about your payment data which I can access directly.";
+    }
+    
+    return "I'm having trouble connecting to my AI service right now, but I can still help with questions about your payment data! Try asking about recent payments, total amounts, or payment statuses.";
+  }
+};
 
   const answerFromData = (question: string): string | null => {
     const q = question.toLowerCase();
@@ -194,63 +216,68 @@ const Chatbot = () => {
     ]);
   };
 
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+const sendMessage = async () => {
+  if (!inputMessage.trim() || isLoading) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputMessage,
-      sender: "user",
+  // Check if this is a navigation command first
+  if (maybeNavigate(inputMessage)) {
+    setInputMessage("");
+    return; // Navigation will happen via the maybeNavigate function
+  }
+
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    content: inputMessage,
+    sender: "user",
+    timestamp: new Date(),
+    isAnimating: true,
+  };
+
+  setMessages((prev) => [...prev, userMessage]);
+  setInputMessage("");
+  setIsLoading(true);
+
+  // Remove animation class after animation completes
+  setTimeout(() => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === userMessage.id ? { ...msg, isAnimating: false } : msg
+      )
+    );
+  }, 300);
+
+  try {
+    const responseText = await getAIResponse(inputMessage);
+
+    const botMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      content: responseText,
+      sender: "bot",
       timestamp: new Date(),
       isAnimating: true,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputMessage("");
-    setIsLoading(true);
+    setMessages((prev) => [...prev, botMessage]);
 
-    // Remove animation class after animation completes
     setTimeout(() => {
       setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === userMessage.id ? { ...msg, isAnimating: false } : msg
-        )
+        prev.map((msg) => (msg.id === botMessage.id ? { ...msg, isAnimating: false } : msg))
       );
     }, 300);
-
-    try {
-      const responseText = await getAIResponse(inputMessage);
-
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: responseText,
-        sender: "bot",
-        timestamp: new Date(),
-        isAnimating: true,
-      };
-
-      setMessages((prev) => [...prev, botMessage]);
-
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((msg) => (msg.id === botMessage.id ? { ...msg, isAnimating: false } : msg))
-        );
-      }, 300);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "Sorry, I hit an unexpected error. Please try again.",
-        sender: "bot",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
-    }
-  };
-
+  } catch (error) {
+    console.error("Error sending message:", error);
+    const errorMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      content: "Sorry, I hit an unexpected error. Please try again.",
+      sender: "bot",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, errorMessage]);
+  } finally {
+    setIsLoading(false);
+    inputRef.current?.focus();
+  }
+};
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -285,22 +312,22 @@ const Chatbot = () => {
     "Open Dashboard"
   ];
 
-  const maybeNavigate = (text: string): boolean => {
-    const q = text.toLowerCase();
-    if (q.includes("open payments") || q.includes("go to payments") || q.includes("navigate to payments")) {
-      navigate("/payments");
-      return true;
-    }
-    if (q.includes("open residents") || q.includes("go to residents") || q.includes("navigate to residents")) {
-      navigate("/residents");
-      return true;
-    }
-    if (q.includes("open dashboard") || q.includes("go to dashboard") || q.includes("navigate to dashboard")) {
-      navigate("/");
-      return true;
-    }
-    return false;
-  };
+const maybeNavigate = (text: string): boolean => {
+  const q = text.toLowerCase();
+  if (q.includes("open payments") || q.includes("go to payments") || q.includes("navigate to payments")) {
+    navigate("/payments");
+    return true;
+  }
+  if (q.includes("open residents") || q.includes("go to residents") || q.includes("navigate to residents")) {
+    navigate("/residents");
+    return true;
+  }
+  if (q.includes("open dashboard") || q.includes("go to dashboard") || q.includes("navigate to dashboard")) {
+    navigate("/");
+    return true;
+  }
+  return false;
+};
 
   const handleSuggestionClick = (text: string) => {
     if (!maybeNavigate(text)) {
