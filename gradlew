@@ -28,6 +28,32 @@
 # Check if we're in the project root and android directory exists
 if [ -d "android" ] && [ -f "android/gradlew" ]; then
     echo "Delegating to android/gradlew..."
+    
+    # Check if this is a CI/CD environment and run Capacitor preparation
+    if [ "$CI" = "true" ] || [ "$CONTINUOUS_INTEGRATION" = "true" ] || [ -n "$GITLAB_CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
+        echo "CI/CD environment detected. Preparing Capacitor Android..."
+        
+        # Check if node_modules exists and npm is available
+        if [ -f "package.json" ] && command -v npm >/dev/null 2>&1; then
+            if [ ! -d "node_modules" ]; then
+                echo "Installing npm dependencies..."
+                npm ci || npm install
+            fi
+            
+            # Build web assets if dist doesn't exist
+            if [ ! -d "dist" ]; then
+                echo "Building web application..."
+                npm run build
+            fi
+            
+            # Run Capacitor sync to ensure Android project is properly set up
+            if command -v npx >/dev/null 2>&1; then
+                echo "Syncing Capacitor Android..."
+                npx cap sync android || echo "Warning: Capacitor sync failed"
+            fi
+        fi
+    fi
+    
     cd android
     exec ./gradlew "$@"
 fi

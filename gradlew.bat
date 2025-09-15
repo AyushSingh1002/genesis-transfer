@@ -27,6 +27,36 @@
 @rem Check if we're in the project root and android directory exists
 if exist "android" if exist "android\gradlew.bat" (
     echo Delegating to android\gradlew.bat...
+    
+    @rem Check if this is a CI/CD environment and run Capacitor preparation
+    if "%CI%"=="true" (
+        echo CI/CD environment detected. Preparing Capacitor Android...
+        
+        @rem Check if node_modules exists and npm is available
+        if exist "package.json" (
+            where npm >nul 2>nul
+            if %ERRORLEVEL%==0 (
+                if not exist "node_modules" (
+                    echo Installing npm dependencies...
+                    call npm ci || call npm install
+                )
+                
+                @rem Build web assets if dist doesn't exist
+                if not exist "dist" (
+                    echo Building web application...
+                    call npm run build
+                )
+                
+                @rem Run Capacitor sync to ensure Android project is properly set up
+                where npx >nul 2>nul
+                if %ERRORLEVEL%==0 (
+                    echo Syncing Capacitor Android...
+                    call npx cap sync android || echo Warning: Capacitor sync failed
+                )
+            )
+        )
+    )
+    
     cd android
     call gradlew.bat %*
     exit /b %ERRORLEVEL%
