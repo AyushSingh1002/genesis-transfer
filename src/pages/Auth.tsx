@@ -19,6 +19,7 @@ const Auth = () => {
     email: '',
     password: '',
     role: 'resident' as 'owner' | 'resident',
+    referralCode: '',
   });
   const [signInData, setSignInData] = useState({
     email: '',
@@ -34,7 +35,7 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      await signUp(signUpData.email, signUpData.password, signUpData.fullName, signUpData.role);
+      await signUp(signUpData.email, signUpData.password, signUpData.fullName, signUpData.role, signUpData.referralCode);
       toast({
         title: "Account created!",
         description: `Welcome to CoHub! Your ${signUpData.role} account has been created successfully.`,
@@ -331,6 +332,16 @@ const Auth = () => {
                       <option value="resident">Resident</option>
                       <option value="owner">Property Owner</option>
                     </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-referral">Referral Code (Optional)</Label>
+                    <Input
+                      id="signup-referral"
+                      type="text"
+                      placeholder="Enter referral code if you have one"
+                      value={signUpData.referralCode}
+                      onChange={(e) => setSignUpData({ ...signUpData, referralCode: e.target.value })}
+                    />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (

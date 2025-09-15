@@ -1,0 +1,140 @@
+/* Mobile-specific optimizations for the chatbot */
+
+/* Ensure proper touch targets on mobile */
+@media (max-width: 768px) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Improve text readability on mobile */
+  .mobile-text {
+    font-size: 16px; /* Prevents zoom on iOS */
+    line-height: 1.5;
+  }
+
+  /* Better scrolling behavior */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Optimize keyboard handling */
+  .keyboard-adjust {
+    transition: margin-bottom 0.3s ease-in-out;
+  }
+
+  /* Safe area handling for notched devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Improved focus states for mobile */
+  .mobile-focus:focus {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+  }
+
+  /* Better hover states for touch devices */
+  @media (hover: none) {
+    .hover-scale:hover {
+      transform: none;
+    }
+    
+    .hover-scale:active {
+      transform: scale(0.98);
+    }
+  }
+
+  /* Optimize animations for mobile performance */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Improve message bubble layout on small screens */
+  .message-bubble {
+    max-width: 85%;
+    word-wrap: break-word;
+    hyphens: auto;
+  }
+
+  /* Better input handling on mobile */
+  .mobile-input {
+    font-size: 16px; /* Prevents zoom on iOS */
+    border-radius: 12px;
+    padding: 12px 16px;
+  }
+
+  /* Optimize suggestion buttons for touch */
+  .suggestion-button {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  /* Improve loading states */
+  .mobile-loader {
+    transform-origin: center;
+  }
+
+  /* Better spacing for mobile */
+  .mobile-spacing {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  /* Optimize card layouts for mobile */
+  .mobile-card {
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Landscape mobile optimizations */
+@media (max-width: 768px) and (orientation: landscape) {
+  .landscape-adjust {
+    height: calc(100vh - 60px);
+  }
+}
+
+/* Very small screens (iPhone SE, etc.) */
+@media (max-width: 375px) {
+  .xs-mobile-text {
+    font-size: 14px;
+  }
+  
+  .xs-mobile-padding {
+    padding: 8px 12px;
+  }
+}

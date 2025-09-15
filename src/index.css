@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import mobile-specific styles */
+@import './styles/mobile.css';
+
 /* Clean Design System - Ready for customization */
 
 @layer base {
