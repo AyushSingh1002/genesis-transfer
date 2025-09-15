@@ -1,0 +1,46 @@
+#!/bin/bash
+# CI/CD wrapper for gradlew that ensures Capacitor is properly set up
+# Use this script in CI/CD instead of gradlew directly
+
+set -e
+
+echo "🔧 CI/CD Gradle Wrapper - Preparing Capacitor Android build..."
+
+# Ensure we're in the project root
+if [ ! -f "capacitor.config.ts" ]; then
+    echo "❌ Error: capacitor.config.ts not found. Are you in the project root?"
+    exit 1
+fi
+
+# Install npm dependencies if needed
+if [ ! -d "node_modules" ] && [ -f "package.json" ]; then
+    echo "📦 Installing npm dependencies..."
+    if command -v npm >/dev/null 2>&1; then
+        npm ci || npm install
+    else
+        echo "❌ Error: npm not found"
+        exit 1
+    fi
+fi
+
+# Build web application if needed
+if [ ! -d "dist" ] && [ -f "package.json" ]; then
+    echo "🏗️ Building web application..."
+    npm run build
+fi
+
+# Sync Capacitor Android
+if command -v npx >/dev/null 2>&1; then
+    echo "🔄 Syncing Capacitor Android..."
+    npx cap sync android
+    echo "🔄 Updating Capacitor Android..."
+    npx cap update android
+else
+    echo "❌ Error: npx not found"
+    exit 1
+fi
+
+# Now run the actual gradle command
+echo "🚀 Running Android build..."
+cd android
+exec ./gradlew "$@"
