@@ -8,14 +8,8 @@ import IssueCard from "@/components/IssueCard";
 import BottomNavigation from "@/components/BottomNavigation";
 import AddPropertyModal from "@/components/AddPropertyModal";
 import { useAuth } from "@/context/AuthContext";
-import { createClient } from "@supabase/supabase-js";
 import { db } from "@/integrations/firebase/client";
-import { collection, getDocs, query, where } from "firebase/firestore";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
+import { collection, getDocs, query, where, addDoc, updateDoc, doc, orderBy } from "firebase/firestore";
 
 type Status = "pending" | "in-progress" | "resolved";
 
@@ -69,6 +63,56 @@ const Dashboard = () => {
 
   const isOwner = userProfile?.role === 'owner' || isGuest;
 
+  // Helper function to create sample issues in Firebase (for development)
+  const createSampleIssues = async () => {
+    try {
+      const issuesRef = collection(db, 'issues');
+      const sampleIssues = [
+        {
+          title: "AC Unit Maintenance",
+          priority: "high",
+          submittedBy: "Property Manager",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          unit: "Unit 3A",
+          description: "Annual AC maintenance required",
+          category: "Maintenance",
+          status: "pending"
+        },
+        {
+          title: "Lease Renewal",
+          priority: "medium",
+          submittedBy: "John Smith",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          unit: "Unit 2B",
+          description: "Tenant requesting lease renewal",
+          category: "Administrative",
+          status: "in-progress"
+        },
+        {
+          title: "Property Inspection",
+          priority: "low",
+          submittedBy: "Inspector",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          unit: "Unit 1C",
+          description: "Quarterly property inspection",
+          category: "Inspection",
+          status: "resolved"
+        }
+      ];
+
+      for (const issue of sampleIssues) {
+        await addDoc(issuesRef, issue);
+      }
+      
+      console.log('Sample issues created in Firebase');
+    } catch (error) {
+      console.error('Error creating sample issues:', error);
+    }
+  };
+
   // Fetch dashboard data from Firebase
   const fetchDashboardData = async () => {
     try {
@@ -96,7 +140,7 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch real issues from Supabase
+  // Fetch real issues from Firebase
   useEffect(() => {
     fetchIssues();
     fetchDashboardData();
@@ -105,30 +149,37 @@ const Dashboard = () => {
   const fetchIssues = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('issues')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const issuesRef = collection(db, 'issues');
+      const q = query(issuesRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
       
-      if (error) throw error;
-      
-      if (data) {
-        // Transform Supabase data to match our interface
-        const transformedIssues = data.map(issue => ({
-          id: issue.id,
-          title: issue.title,
-          priority: issue.priority,
-          reporter: issue.submitted_by,
-          date: new Date(issue.created_at).toLocaleDateString(),
-          unit: issue.unit || 'N/A',
-          description: issue.description,
-          category: issue.category,
-          status: issue.status
-        }));
-        setIssues(transformedIssues);
+      if (snapshot.empty) {
+        // If no issues in Firebase, create sample issues and use mock data as fallback
+        if (isOwner) {
+          await createSampleIssues();
+        }
+        setIssues(mockIssues);
+        return;
       }
+      
+      const transformedIssues = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled Issue',
+          priority: data.priority || 'medium',
+          reporter: data.submittedBy || data.reporter || 'Unknown',
+          date: data.createdAt ? new Date(data.createdAt.toDate ? data.createdAt.toDate() : data.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+          unit: data.unit || 'N/A',
+          description: data.description || '',
+          category: data.category || 'General',
+          status: data.status || 'pending'
+        };
+      });
+      
+      setIssues(transformedIssues);
     } catch (error) {
-      console.error('Error fetching issues:', error);
+      console.error('Error fetching issues from Firebase:', error);
       // Fall back to mock data if there's an error
       setIssues(mockIssues);
     } finally {
@@ -138,19 +189,18 @@ const Dashboard = () => {
 
   const updateIssueStatus = async (issueId: string, newStatus: Status) => {
     try {
-      const { error } = await supabase
-        .from('issues')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', issueId);
-      
-      if (error) throw error;
+      const issueRef = doc(db, 'issues', issueId);
+      await updateDoc(issueRef, { 
+        status: newStatus, 
+        updatedAt: new Date()
+      });
       
       // Update local state
       setIssues(prev => prev.map(issue => 
         issue.id === issueId ? { ...issue, status: newStatus } : issue
       ));
     } catch (error) {
-      console.error('Error updating issue status:', error);
+      console.error('Error updating issue status in Firebase:', error);
     }
   };
 

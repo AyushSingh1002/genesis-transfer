@@ -1,0 +1,10 @@
+{
+  "appId": "com.example.app",
+  "appName": "owners-hub-app",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false
+    }
+  }
+}

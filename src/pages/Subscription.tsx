@@ -88,7 +88,7 @@ const Subscription = () => {
 
       script.onload = () => {
         const options = {
-          key: 'rzp_test_9999999999999999', // Replace with your Razorpay key
+          key: 'rzp_test_VSkkDl7N8oIENZ', // Replace with your Razorpay key
           amount: plan.price * 100, // Amount in paise
           currency: 'INR',
           name: 'Owners Hub',
