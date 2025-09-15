@@ -1,38 +1,42 @@
-import { Clock, Play, CheckCircle, AlertTriangle } from "lucide-react";
+import { Clock, Play, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
-const stats = [
-  {
-    title: "Pending Issues",
-    value: "5",
-    icon: Clock,
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-50"
-  },
-  {
-    title: "In Progress", 
-    value: "0",
-    icon: Play,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50"
-  },
-  {
-    title: "Resolved",
-    value: "0", 
-    icon: CheckCircle,
-    color: "text-green-600",
-    bgColor: "bg-green-50"
-  },
-  {
-    title: "High Priority",
-    value: "2",
-    icon: AlertTriangle,
-    color: "text-red-600", 
-    bgColor: "bg-red-50"
-  }
-];
+interface StatsCardsProps {
+  issues: any[];
+  loading?: boolean;
+}
 
-const StatsCards = () => {
+const StatsCards = ({ issues, loading = false }: StatsCardsProps) => {
+  const stats = [
+    {
+      title: "Pending Issues",
+      value: loading ? null : issues.filter(issue => issue.status === "pending").length.toString(),
+      icon: Clock,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-50"
+    },
+    {
+      title: "In Progress", 
+      value: loading ? null : issues.filter(issue => issue.status === "in-progress").length.toString(),
+      icon: Play,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50"
+    },
+    {
+      title: "Resolved",
+      value: loading ? null : issues.filter(issue => issue.status === "resolved").length.toString(), 
+      icon: CheckCircle,
+      color: "text-green-600",
+      bgColor: "bg-green-50"
+    },
+    {
+      title: "High Priority",
+      value: loading ? null : issues.filter(issue => issue.priority === "high").length.toString(),
+      icon: AlertTriangle,
+      color: "text-red-600", 
+      bgColor: "bg-red-50"
+    }
+  ];
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {stats.map((stat) => (
@@ -44,7 +48,9 @@ const StatsCards = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{stat.title}</p>
-                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : stat.value}
+                </p>
               </div>
             </div>
           </CardContent>

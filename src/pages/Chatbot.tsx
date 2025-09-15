@@ -309,7 +309,7 @@ const Chatbot = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10 safe-area-top safe-area-bottom">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/10 safe-area-top safe-area-bottom mobile-scroll">
       <Header />
       
       <main 
@@ -371,7 +371,7 @@ const Chatbot = () => {
         {/* Enhanced Messages Container - Mobile Optimized */}
         <Card className="flex-1 mb-2 sm:mb-4 overflow-hidden shadow-xl border-border/50 backdrop-blur-sm bg-background/95 animate-scale-in min-h-0">
           <CardContent className="p-0 h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-6 scroll-smooth overscroll-contain">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-6 scroll-smooth overscroll-contain mobile-scroll">
               {messages.map((message, index) => (
                 <div
                   key={message.id}
@@ -399,7 +399,7 @@ const Chatbot = () => {
                     </AvatarFallback>
                   </Avatar>
                   
-                  <div className={`flex-1 max-w-[85%] sm:max-w-[85%] ${
+                  <div className={`flex-1 max-w-[85%] sm:max-w-[85%] message-bubble ${
                     message.sender === "user" ? "text-right" : ""
                   }`}>
                     <div className={`group relative ${
@@ -498,7 +498,7 @@ const Chatbot = () => {
                     onChange={(e) => setInputMessage(e.target.value)}
                     onKeyDown={handleKeyPress}
                     placeholder="Ask me anything about your property management..."
-                    className="min-h-[40px] sm:min-h-[44px] max-h-24 sm:max-h-32 resize-none pr-10 sm:pr-12 text-sm border-border/50 focus:border-primary/50 transition-all duration-200 rounded-xl"
+                    className="min-h-[40px] sm:min-h-[44px] max-h-24 sm:max-h-32 resize-none pr-10 sm:pr-12 text-sm border-border/50 focus:border-primary/50 transition-all duration-200 rounded-xl mobile-input mobile-focus touch-target"
                     disabled={isLoading}
                     style={{ 
                       scrollbarWidth: 'thin',
@@ -515,7 +515,7 @@ const Chatbot = () => {
                   onClick={sendMessage}
                   disabled={!inputMessage.trim() || isLoading}
                   size="icon"
-                  className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 hover-scale disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 hover-scale disabled:opacity-50 disabled:cursor-not-allowed touch-target"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />

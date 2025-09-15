@@ -15,7 +15,7 @@ interface AuthContextType {
   user: User | null;
   isGuest: boolean;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, role?: 'owner' | 'resident') => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, role?: 'owner' | 'resident', referralCode?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
@@ -28,6 +28,7 @@ interface UserProfile {
   email: string;
   createdAt: string;
   role?: 'owner' | 'resident' | 'guest';
+  referralCode?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -76,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string, role: 'owner' | 'resident' = 'resident') => {
+  const signUp = async (email: string, password: string, fullName: string, role: 'owner' | 'resident' = 'resident', referralCode?: string) => {
     const { user } = await createUserWithEmailAndPassword(auth, email, password);
     
     // Create user profile in Firestore
@@ -85,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       role,
       createdAt: new Date().toISOString(),
+      ...(referralCode && { referralCode }),
     };
     
     await setDoc(doc(db, 'users', user.uid), userProfile);

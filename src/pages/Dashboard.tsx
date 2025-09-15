@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, Users, Home, Activity } from "lucide-react";
+import { Plus, TrendingUp, Users, Home, Activity, Loader2 } from "lucide-react";
 import Header from "@/components/Header";
 import StatsCards from "@/components/StatsCards";
 import IssueCard from "@/components/IssueCard";
@@ -9,6 +9,8 @@ import BottomNavigation from "@/components/BottomNavigation";
 import AddPropertyModal from "@/components/AddPropertyModal";
 import { useAuth } from "@/context/AuthContext";
 import { createClient } from "@supabase/supabase-js";
+import { db } from "@/integrations/firebase/client";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -58,13 +60,46 @@ const Dashboard = () => {
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
   const [issues, setIssues] = useState(mockIssues);
   const [loading, setLoading] = useState(false);
+  const [dashboardData, setDashboardData] = useState({
+    residents: [],
+    payments: [],
+    loading: true
+  });
   const { userProfile, isGuest } = useAuth();
 
   const isOwner = userProfile?.role === 'owner' || isGuest;
 
+  // Fetch dashboard data from Firebase
+  const fetchDashboardData = async () => {
+    try {
+      setDashboardData(prev => ({ ...prev, loading: true }));
+      
+      // Fetch residents
+      const residentsRef = collection(db, 'users');
+      const residentsQuery = query(residentsRef, where("role", "==", "resident"));
+      const residentsSnapshot = await getDocs(residentsQuery);
+      const residents = residentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Fetch payments
+      const paymentsRef = collection(db, 'payments');
+      const paymentsSnapshot = await getDocs(paymentsRef);
+      const payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      setDashboardData({
+        residents,
+        payments,
+        loading: false
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setDashboardData(prev => ({ ...prev, loading: false }));
+    }
+  };
+
   // Fetch real issues from Supabase
   useEffect(() => {
     fetchIssues();
+    fetchDashboardData();
   }, []);
 
   const fetchIssues = async () => {
@@ -119,6 +154,37 @@ const Dashboard = () => {
     }
   };
 
+  // Calculate dashboard statistics from real data
+  const dashboardStats = useMemo(() => {
+    const { residents, payments } = dashboardData;
+    
+    // Calculate total properties (assume each resident has a unit, or use a default)
+    const totalProperties = residents.length || 12; // fallback to 12 if no data
+    
+    // Calculate occupied units (active residents)
+    const occupiedUnits = residents.filter(r => r.status === 'active').length;
+    
+    // Calculate monthly revenue from payments (sum of recent payments)
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const monthlyRevenue = payments
+      .filter(payment => {
+        const paymentDate = payment.created_at ? new Date(payment.created_at.toDate ? payment.created_at.toDate() : payment.created_at) : new Date();
+        return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+    
+    // Calculate occupancy rate
+    const occupancyRate = totalProperties > 0 ? Math.round((occupiedUnits / totalProperties) * 100) : 0;
+    
+    return {
+      totalProperties,
+      occupiedUnits,
+      monthlyRevenue,
+      occupancyRate
+    };
+  }, [dashboardData]);
+
   const filteredIssues = issues.filter(issue => {
     if (activeTab === "all") return true;
     if (activeTab === "pending") return issue.status === "pending";
@@ -151,7 +217,9 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Properties</p>
-                  <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">12</p>
+                  <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
+                    {dashboardData.loading ? <Loader2 className="h-8 w-8 animate-spin" /> : dashboardStats.totalProperties}
+                  </p>
                 </div>
               </div>
             </div>
@@ -163,7 +231,9 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm text-green-600 dark:text-green-400 font-medium">Occupied Units</p>
-                  <p className="text-3xl font-bold text-green-900 dark:text-green-100">10</p>
+                  <p className="text-3xl font-bold text-green-900 dark:text-green-100">
+                    {dashboardData.loading ? <Loader2 className="h-8 w-8 animate-spin" /> : dashboardStats.occupiedUnits}
+                  </p>
                 </div>
               </div>
             </div>
@@ -175,7 +245,9 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Monthly Revenue</p>
-                  <p className="text-3xl font-bold text-purple-900 dark:text-purple-100">$24,500</p>
+                  <p className="text-3xl font-bold text-purple-900 dark:text-purple-100">
+                    {dashboardData.loading ? <Loader2 className="h-8 w-8 animate-spin" /> : `₹${dashboardStats.monthlyRevenue.toLocaleString()}`}
+                  </p>
                 </div>
               </div>
             </div>
@@ -187,14 +259,16 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Occupancy Rate</p>
-                  <p className="text-3xl font-bold text-orange-900 dark:text-orange-100">83%</p>
+                  <p className="text-3xl font-bold text-orange-900 dark:text-orange-100">
+                    {dashboardData.loading ? <Loader2 className="h-8 w-8 animate-spin" /> : `${dashboardStats.occupancyRate}%`}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <StatsCards />
+        <StatsCards issues={issues} loading={loading} />
 
         {isOwner && (
           <Button 

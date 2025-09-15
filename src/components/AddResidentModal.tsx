@@ -5,14 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { db } from "@/integrations/firebase/client";
+import { collection, addDoc } from "firebase/firestore";
+import { Loader2 } from "lucide-react";
 
 interface AddResidentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onResidentAdded?: () => void; // Callback to refresh residents list
 }
 
-const AddResidentModal = ({ isOpen, onClose }: AddResidentModalProps) => {
+const AddResidentModal = ({ isOpen, onClose, onResidentAdded }: AddResidentModalProps) => {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -24,30 +29,62 @@ const AddResidentModal = ({ isOpen, onClose }: AddResidentModalProps) => {
     securityDeposit: ""
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Here you would typically send the data to your backend
-    console.log("New resident:", formData);
-    
-    toast({
-      title: "Resident Added",
-      description: "New resident has been successfully added to your property.",
-    });
-    
-    // Reset form
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      unit: "",
-      leaseStart: "",
-      leaseEnd: "",
-      monthlyRent: "",
-      securityDeposit: ""
-    });
-    
-    onClose();
+    try {
+      // Save new resident to Firebase
+      const residentData = {
+        fullName: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        unit: formData.unit,
+        leaseStart: formData.leaseStart,
+        leaseEnd: new Date(formData.leaseEnd).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        monthlyRent: parseFloat(formData.monthlyRent),
+        securityDeposit: parseFloat(formData.securityDeposit),
+        role: "resident",
+        status: "active",
+        rentPaid: true,
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'users'), residentData);
+      
+      toast({
+        title: "Resident Added",
+        description: "New resident has been successfully added to your property.",
+      });
+      
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        unit: "",
+        leaseStart: "",
+        leaseEnd: "",
+        monthlyRent: "",
+        securityDeposit: ""
+      });
+      
+      // Refresh the residents list
+      if (onResidentAdded) {
+        onResidentAdded();
+      }
+      
+      onClose();
+    } catch (error) {
+      console.error("Error adding resident:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add resident. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -164,11 +201,18 @@ const AddResidentModal = ({ isOpen, onClose }: AddResidentModalProps) => {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" className="flex-1">
-              Add Resident
+            <Button type="submit" className="flex-1" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add Resident"
+              )}
             </Button>
           </div>
         </form>
