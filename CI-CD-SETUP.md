@@ -10,19 +10,29 @@ The CI/CD environment doesn't have the Capacitor Android project properly config
 
 ## Solutions (Choose One)
 
-### Option 1: Use the CI-specific wrapper (Recommended)
+### Option 1: Add preparation step to CI/CD (Recommended)
+Add this step **before** your gradlew command in your CI/CD pipeline:
+```bash
+./prepare-capacitor.sh
+```
+Then run your normal gradlew command:
+```bash
+./gradlew assembleDebug
+```
+
+### Option 2: Use the CI-specific wrapper
 Replace your current gradlew command in CI/CD with:
 ```bash
 ./ci-gradlew assembleDebug
 ```
 
-### Option 2: Use npm script
+### Option 3: Use npm script
 Replace your current build command with:
 ```bash
 npm run build:android
 ```
 
-### Option 3: Manual steps in CI/CD
+### Option 4: Manual steps in CI/CD
 Add these steps before running gradlew:
 ```bash
 # Install dependencies
@@ -41,7 +51,7 @@ npx cap update android
 cd android && ./gradlew assembleDebug
 ```
 
-### Option 4: Use the preparation script
+### Option 5: Use the preparation script
 Run the preparation script first:
 ```bash
 ./scripts/prepare-android-build.sh
