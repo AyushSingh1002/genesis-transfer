@@ -30,14 +30,14 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-    // Enable gzip compression
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: mode === 'production',
-        drop_debugger: mode === 'production',
+    // Use esbuild for minification (default, faster than terser)
+    minify: 'esbuild',
+    // Remove console logs and debugger in production
+    ...(mode === 'production' && {
+      esbuild: {
+        drop: ['console', 'debugger'],
       },
-    },
+    }),
   },
   // Enable CSS code splitting
   css: {
