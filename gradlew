@@ -29,12 +29,12 @@
 if [ -d "android" ] && [ -f "android/gradlew" ]; then
     echo "Delegating to android/gradlew..."
     
-    # Check if this is a CI/CD environment and run Capacitor preparation
-    if [ "$CI" = "true" ] || [ "$CONTINUOUS_INTEGRATION" = "true" ] || [ -n "$GITLAB_CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
-        echo "CI/CD environment detected. Preparing Capacitor Android..."
-        
-        # Check if node_modules exists and npm is available
-        if [ -f "package.json" ] && command -v npm >/dev/null 2>&1; then
+    # Check if Capacitor preparation is needed (always check if we have the tools)
+    if [ -f "package.json" ] && command -v npm >/dev/null 2>&1; then
+        # Check if node_modules/@capacitor/android/capacitor exists and has build.gradle
+        if [ ! -f "node_modules/@capacitor/android/capacitor/build.gradle" ]; then
+            echo "Capacitor Android dependency missing. Preparing build environment..."
+            
             if [ ! -d "node_modules" ]; then
                 echo "Installing npm dependencies..."
                 npm ci || npm install
@@ -50,7 +50,11 @@ if [ -d "android" ] && [ -f "android/gradlew" ]; then
             if command -v npx >/dev/null 2>&1; then
                 echo "Syncing Capacitor Android..."
                 npx cap sync android || echo "Warning: Capacitor sync failed"
+                echo "Updating Capacitor Android..."
+                npx cap update android || echo "Warning: Capacitor update failed"
             fi
+        else
+            echo "Capacitor Android dependency found. Proceeding with build..."
         fi
     fi
     

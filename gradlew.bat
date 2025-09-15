@@ -28,14 +28,14 @@
 if exist "android" if exist "android\gradlew.bat" (
     echo Delegating to android\gradlew.bat...
     
-    @rem Check if this is a CI/CD environment and run Capacitor preparation
-    if "%CI%"=="true" (
-        echo CI/CD environment detected. Preparing Capacitor Android...
-        
-        @rem Check if node_modules exists and npm is available
-        if exist "package.json" (
-            where npm >nul 2>nul
-            if %ERRORLEVEL%==0 (
+    @rem Check if Capacitor preparation is needed (always check if we have the tools)
+    if exist "package.json" (
+        where npm >nul 2>nul
+        if %ERRORLEVEL%==0 (
+            @rem Check if node_modules\@capacitor\android\capacitor exists and has build.gradle
+            if not exist "node_modules\@capacitor\android\capacitor\build.gradle" (
+                echo Capacitor Android dependency missing. Preparing build environment...
+                
                 if not exist "node_modules" (
                     echo Installing npm dependencies...
                     call npm ci || call npm install
@@ -52,7 +52,11 @@ if exist "android" if exist "android\gradlew.bat" (
                 if %ERRORLEVEL%==0 (
                     echo Syncing Capacitor Android...
                     call npx cap sync android || echo Warning: Capacitor sync failed
+                    echo Updating Capacitor Android...
+                    call npx cap update android || echo Warning: Capacitor update failed
                 )
+            ) else (
+                echo Capacitor Android dependency found. Proceeding with build...
             )
         )
     )
