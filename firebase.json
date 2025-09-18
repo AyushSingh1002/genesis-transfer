@@ -1,6 +1,6 @@
 {
   "appdistribution": {
-    "app": "1:123456789:android:abcdef1234567890abcdef",
+    "app": "1:587592082463:android:f9c907b1a4b1710fb5e12a",
     "groups": {
       "testers": ["tester1@example.com", "tester2@example.com"],
       "internal": ["internal@yourcompany.com"]

@@ -17,7 +17,8 @@
     "distribute:android:win": "scripts\\distribute-android.bat",
     "distribute:fastlane": "fastlane android distribute",
     "firebase:login": "firebase login",
-    "firebase:init": "firebase init appdistribution"
+    "firebase:init": "firebase init appdistribution",
+    "firebase:test": "./scripts/test-firebase-setup.sh"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
