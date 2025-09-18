@@ -12,7 +12,12 @@
     "cap:sync": "cap sync",
     "cap:sync:android": "cap sync android",
     "prepare:android": "npm run build && npx cap sync android && npx cap update android",
-    "build:android": "npm run prepare:android && cd android && ./gradlew assembleDebug"
+    "build:android": "npm run prepare:android && cd android && ./gradlew assembleDebug",
+    "distribute:android": "./scripts/distribute-android.sh",
+    "distribute:android:win": "scripts\\distribute-android.bat",
+    "distribute:fastlane": "fastlane android distribute",
+    "firebase:login": "firebase login",
+    "firebase:init": "firebase init appdistribution"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

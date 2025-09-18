@@ -1,0 +1,63 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+default_platform(:android)
+
+platform :android do
+  desc "Build and distribute Android app via Firebase App Distribution"
+  lane :distribute do
+    # Build the web app
+    sh("npm run build")
+    
+    # Sync Capacitor
+    sh("npx cap sync android")
+    
+    # Build Android APK
+    gradle(
+      task: "assembleDebug",
+      project_dir: "android"
+    )
+    
+    # Find the APK file
+    apk_path = Dir.glob("android/app/build/outputs/apk/debug/*.apk").first
+    
+    if apk_path.nil?
+      UI.user_error!("APK file not found. Build may have failed.")
+    end
+    
+    UI.success("APK built successfully: #{apk_path}")
+    
+    # Get release notes from environment or use default
+    release_notes = ENV["RELEASE_NOTES"] || "New build available for testing"
+    
+    # Get testers from environment or use default
+    testers = ENV["TESTERS"] || ""
+    
+    # Distribute via Firebase App Distribution
+    sh("firebase appdistribution:distribute '#{apk_path}' --release-notes '#{release_notes}' #{testers.empty? ? '' : "--testers '#{testers}'"}")
+    
+    UI.success("App distributed successfully via Firebase App Distribution!")
+  end
+  
+  desc "Build and distribute to specific testers"
+  lane :distribute_to_testers do |options|
+    # Set environment variables for testers
+    ENV["TESTERS"] = options[:testers] if options[:testers]
+    ENV["RELEASE_NOTES"] = options[:release_notes] if options[:release_notes]
+    
+    # Call the distribute lane
+    distribute
+  end
+end
