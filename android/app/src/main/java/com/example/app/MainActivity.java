@@ -1,4 +1,4 @@
-package com.example.app;
+package com.CoLiv.Manager.app;
 
 import com.getcapacitor.BridgeActivity;
 
