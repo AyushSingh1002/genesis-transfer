@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "493471534294",
+    "project_id": "cohubownercrash",
+    "storage_bucket": "cohubownercrash.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:493471534294:android:e4ec807f59d08279324d77",
+        "android_client_info": {
+          "package_name": "com.example.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANmQzVlUfIpXvqpuFKDwJUIAO31wbFBnI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -10,6 +10,7 @@ import AddPropertyModal from "@/components/AddPropertyModal";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/integrations/firebase/client";
 import { collection, getDocs, query, where, addDoc, updateDoc, doc, orderBy } from "firebase/firestore";
+import { useCrashlytics } from "@/hooks/use-crashlytics";
 
 type Status = "pending" | "in-progress" | "resolved";
 
@@ -60,6 +61,7 @@ const Dashboard = () => {
     loading: true
   });
   const { userProfile, isGuest } = useAuth();
+  const crashlytics = useCrashlytics();
 
   const isOwner = userProfile?.role === 'owner' || isGuest;
 
@@ -116,6 +118,7 @@ const Dashboard = () => {
   // Fetch dashboard data from Firebase
   const fetchDashboardData = async () => {
     try {
+      crashlytics.log('Fetching dashboard data');
       setDashboardData(prev => ({ ...prev, loading: true }));
       
       // Fetch residents
@@ -134,8 +137,10 @@ const Dashboard = () => {
         payments,
         loading: false
       });
+      crashlytics.log('Dashboard data fetched successfully');
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      crashlytics.recordError(error as Error);
       setDashboardData(prev => ({ ...prev, loading: false }));
     }
   };

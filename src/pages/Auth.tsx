@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useCrashlytics } from '@/hooks/use-crashlytics';
 import { Loader2, Home, UserPlus, LogIn, Users } from 'lucide-react';
 
 const Auth = () => {
@@ -29,19 +30,25 @@ const Auth = () => {
   const { signUp, signIn, signInAsGuest, resetPassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const crashlytics = useCrashlytics();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
+      crashlytics.log('User attempting sign up');
       await signUp(signUpData.email, signUpData.password, signUpData.fullName, signUpData.role, signUpData.referralCode);
+      crashlytics.setUserId(signUpData.email);
+      crashlytics.setAttribute('user_role', signUpData.role);
+      crashlytics.log('User signed up successfully');
       toast({
         title: "Account created!",
         description: `Welcome to CoHub! Your ${signUpData.role} account has been created successfully.`,
       });
       navigate('/');
     } catch (error: any) {
+      crashlytics.recordError(error);
       toast({
         title: "Sign up failed",
         description: error.message || "Please try again.",
@@ -57,13 +64,17 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
+      crashlytics.log('User attempting sign in');
       await signIn(signInData.email, signInData.password);
+      crashlytics.setUserId(signInData.email);
+      crashlytics.log('User signed in successfully');
       toast({
         title: "Welcome back!",
         description: "You have been signed in successfully.",
       });
       navigate('/');
     } catch (error: any) {
+      crashlytics.recordError(error);
       toast({
         title: "Sign in failed",
         description: error.message || "Please check your credentials and try again.",

@@ -1,6 +1,8 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getAnalytics } from "firebase/analytics";
+import { getPerformance } from "firebase/performance";
 
 // Prefer Vite env vars
 const firebaseConfig = {
@@ -21,5 +23,12 @@ if (!getApps().length) {
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+// Initialize Analytics and Performance (optional but recommended)
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+export const performance = typeof window !== 'undefined' ? getPerformance(app) : null;
+
+// Export Crashlytics service
+export { crashlyticsService } from './crashlytics';
 
 
