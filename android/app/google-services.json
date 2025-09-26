@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:587592082463:android:f9c907b1a4b1710fb5e12a",
         "android_client_info": {
-          "package_name": "CoLiv.Manager"
+          "package_name": "com.coliv.manager"
         }
       },
       "oauth_client": [],
