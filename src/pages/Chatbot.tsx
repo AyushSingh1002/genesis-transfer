@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/integrations/firebase/client";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where, limit, startAfter, doc, getDoc, addDoc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import BottomNavigation from "@/components/BottomNavigation";
@@ -34,10 +34,114 @@ const Chatbot = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [paymentsData, setPaymentsData] = useState<any[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isLoadingChat, setIsLoadingChat] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Gemini API configuration
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "your-api-key-here";
+  const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+  // Chat persistence functions
+  const saveMessage = async (message: Message) => {
+    if (!user || isGuest) return;
+    
+    try {
+      const chatRef = collection(db, "chats");
+      const messageData = {
+        content: message.content,
+        sender: message.sender,
+        timestamp: serverTimestamp(),
+        userId: user.uid,
+        chatId: currentChatId
+      };
+      
+      if (currentChatId) {
+        // Add message to existing chat
+        await addDoc(collection(db, "chats", currentChatId, "messages"), messageData);
+        
+        // Update chat's updatedAt timestamp
+        const chatDocRef = doc(db, "chats", currentChatId);
+        await updateDoc(chatDocRef, {
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        // Create new chat and add message
+        const newChatRef = await addDoc(chatRef, {
+          userId: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          title: message.content.substring(0, 50) + (message.content.length > 50 ? "..." : "")
+        });
+        
+        setCurrentChatId(newChatRef.id);
+        await addDoc(collection(db, "chats", newChatRef.id, "messages"), messageData);
+      }
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
+  };
+
+  const loadChatHistory = async () => {
+    if (!user || isGuest) {
+      setIsLoadingChat(false);
+      return;
+    }
+    
+    try {
+      const chatsRef = collection(db, "chats");
+      const userChatsQuery = query(chatsRef, where("userId", "==", user.uid));
+      const chatsSnapshot = await getDocs(userChatsQuery);
+      
+      if (!chatsSnapshot.empty) {
+        // Get the most recent chat by comparing timestamps
+        let latestChat = chatsSnapshot.docs[0];
+        let latestTime = latestChat.data().updatedAt || latestChat.data().createdAt;
+        
+        for (const chatDoc of chatsSnapshot.docs) {
+          const chatData = chatDoc.data();
+          const chatTime = chatData.updatedAt || chatData.createdAt;
+          if (chatTime && chatTime > latestTime) {
+            latestChat = chatDoc;
+            latestTime = chatTime;
+          }
+        }
+        
+        setCurrentChatId(latestChat.id);
+        
+        // Load messages from the latest chat
+        const messagesRef = collection(db, "chats", latestChat.id, "messages");
+        const messagesQuery = query(messagesRef);
+        const messagesSnapshot = await getDocs(messagesQuery);
+        
+        const loadedMessages = messagesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            content: data.content || "",
+            sender: data.sender || "bot",
+            timestamp: data.timestamp?.toDate() || new Date(),
+            isAnimating: false
+          };
+        }) as Message[];
+        
+        // Sort by timestamp
+        loadedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        
+        if (loadedMessages.length > 0) {
+          setMessages(loadedMessages);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+    } finally {
+      setIsLoadingChat(false);
+    }
+  };
+
 
   // Mobile keyboard handling
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -98,6 +202,16 @@ const Chatbot = () => {
     fetchPayments();
   }, []);
 
+  // Load chat history on component mount
+  useEffect(() => {
+    if (user && !isGuest) {
+      loadChatHistory();
+    } else {
+      setIsLoadingChat(false);
+    }
+  }, [user, isGuest]);
+
+
   const coerceDate = (value: any): Date => {
     if (!value) return new Date(0);
     if (typeof value === "string") return new Date(value);
@@ -107,6 +221,81 @@ const Chatbot = () => {
       return new Date(value);
     } catch {
       return new Date(0);
+    }
+  };
+
+
+  // Optimized Firebase tool functions
+  const firebaseTools = {
+    queryPayments: async (filters: any = {}) => {
+      try {
+        let q = query(collection(db, "payments"), orderBy("created_at", "desc"));
+        
+        if (filters.customer_name) {
+          q = query(q, where("customer_name", ">=", filters.customer_name), where("customer_name", "<=", filters.customer_name + "\uf8ff"));
+        }
+        if (filters.status) q = query(q, where("status", "==", filters.status));
+        if (filters.amount_min) q = query(q, where("amount", ">=", filters.amount_min));
+        if (filters.amount_max) q = query(q, where("amount", "<=", filters.amount_max));
+        if (filters.limit) q = query(q, limit(filters.limit));
+        
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (error) {
+        console.error("Error querying payments:", error);
+        if (error.message?.includes('ERR_BLOCKED_BY_CLIENT')) {
+          console.warn("Firestore blocked by ad blocker. Please whitelist firestore.googleapis.com");
+        }
+        return [];
+      }
+    },
+
+    queryResidents: async (filters: any = {}) => {
+      try {
+        let q = query(collection(db, "residents"));
+        
+        if (filters.name) {
+          q = query(q, where("name", ">=", filters.name), where("name", "<=", filters.name + "\uf8ff"));
+        }
+        if (filters.unit) q = query(q, where("unit", "==", filters.unit));
+        if (filters.status) q = query(q, where("status", "==", filters.status));
+        if (filters.limit) q = query(q, limit(filters.limit));
+        
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (error) {
+        console.error("Error querying residents:", error);
+        return [];
+      }
+    },
+
+    queryProperties: async (filters: any = {}) => {
+      try {
+        let q = query(collection(db, "properties"));
+        
+        if (filters.name) {
+          q = query(q, where("name", ">=", filters.name), where("name", "<=", filters.name + "\uf8ff"));
+        }
+        if (filters.status) q = query(q, where("status", "==", filters.status));
+        if (filters.limit) q = query(q, limit(filters.limit));
+        
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (error) {
+        console.error("Error querying properties:", error);
+        return [];
+      }
+    },
+
+    getDocument: async (collectionName: string, docId: string) => {
+      try {
+        const docRef = doc(db, collectionName, docId);
+        const docSnap = await getDoc(docRef);
+        return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } : null;
+      } catch (error) {
+        console.error("Error getting document:", error);
+        return null;
+      }
     }
   };
 
@@ -123,35 +312,197 @@ const getAIResponse = async (question: string): Promise<string> => {
       return "Taking you there now...";
     }
 
-    // Use Gemini AI for general conversation - with timeout
+    // Use Gemini REST API with tool calling capabilities
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for efficiency
 
     try {
-      const response = await fetch('https://qtglsxsscxqpividdfsj.supabase.co/functions/v1/gemini-chat', {
+      // Streamlined tool definitions
+      const tools = [
+        {
+          name: "queryPayments",
+          description: "Query payments",
+          parameters: {
+            type: "object",
+            properties: {
+              customer_name: { type: "string" },
+              status: { type: "string" },
+              amount_min: { type: "number" },
+              amount_max: { type: "number" },
+              limit: { type: "number" }
+            }
+          }
+        },
+        {
+          name: "queryResidents", 
+          description: "Query residents",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              unit: { type: "string" },
+              status: { type: "string" },
+              limit: { type: "number" }
+            }
+          }
+        },
+        {
+          name: "queryProperties",
+          description: "Query properties", 
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              status: { type: "string" },
+              limit: { type: "number" }
+            }
+          }
+        },
+        {
+          name: "getDocument",
+          description: "Get document by ID",
+          parameters: {
+            type: "object",
+            properties: {
+              collectionName: { type: "string" },
+              docId: { type: "string" }
+            },
+            required: ["collectionName", "docId"]
+          }
+        }
+      ];
+
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: `Property management assistant. ${isGuest ? 'Guest user.' : `User: ${userProfile?.fullName || 'User'}.`} Help with payments, residents, properties. Query database when needed. Respond naturally, not technically. Be concise and friendly.
+
+Q: ${question}`
+              }
+            ]
+          }
+        ],
+        tools: [
+          {
+            function_declarations: tools
+          }
+        ]
+      };
+
+      const response = await fetch(GEMINI_API_URL, {
         method: 'POST',
         headers: {
+          'x-goog-api-key': GEMINI_API_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: `Context: You are a helpful property management assistant for CoHub. 
-            ${isGuest ? 'The user is browsing as a guest with limited access.' : `The user's name is ${userProfile?.fullName || 'User'}.`}
-            You help with property management, maintenance requests, payments, and resident services.
-            Keep responses helpful, concise, and friendly.
-            
-            User question: ${question}`
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`AI service responded with status: ${response.status}`);
+        throw new Error(`Gemini API responded with status: ${response.status}`);
       }
 
       const data = await response.json();
-      return data.response || "I'm here to help with your property management needs!";
+      
+      // Handle tool calling if Gemini requests it
+      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+        const parts = data.candidates[0].content.parts;
+        const functionCalls = parts.filter((part: any) => part.functionCall);
+        
+        if (functionCalls.length > 0) {
+          let toolResults = [];
+          
+          for (const functionCall of functionCalls) {
+            const { name, args } = functionCall.functionCall;
+            
+            try {
+              let result;
+              switch (name) {
+                case "queryPayments":
+                  result = await firebaseTools.queryPayments(args);
+                  break;
+                case "queryResidents":
+                  result = await firebaseTools.queryResidents(args);
+                  break;
+                case "queryProperties":
+                  result = await firebaseTools.queryProperties(args);
+                  break;
+                case "getDocument":
+                  result = await firebaseTools.getDocument(args.collectionName, args.docId);
+                  break;
+                default:
+                  result = { error: "Unknown tool" };
+              }
+              
+              toolResults.push({
+                functionResponse: {
+                  name: name,
+                  response: result
+                }
+              });
+            } catch (toolError) {
+              toolResults.push({
+                functionResponse: {
+                  name: name,
+                  response: { error: toolError.message }
+                }
+              });
+            }
+          }
+          
+          // Send tool results back to Gemini for final response
+          const finalRequestBody = {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Based on this data, provide a natural, user-friendly response. Don't show technical details or function names. Format as a conversation:
+
+${JSON.stringify(toolResults)}`
+                  }
+                ]
+              }
+            ]
+          };
+          
+          const finalResponse = await fetch(GEMINI_API_URL, {
+            method: 'POST',
+            headers: {
+              'x-goog-api-key': GEMINI_API_KEY,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(finalRequestBody),
+            signal: controller.signal
+          });
+          
+          if (finalResponse.ok) {
+            const finalData = await finalResponse.json();
+            let response = finalData.candidates?.[0]?.content?.parts?.[0]?.text || "I found some data but couldn't process it properly.";
+            
+            // Clean up technical formatting if needed
+            if (response.includes('**1. Payments (`queryPayments`)**') || response.includes('function returned')) {
+              response = response
+                .replace(/\*\*.*?\(`.*?`\):\*\*/g, '')
+                .replace(/The `.*?` function returned/g, 'I found')
+                .replace(/Payment ID:/g, 'Payment:')
+                .replace(/User ID:/g, 'User:')
+                .replace(/Created At:/g, 'Date:')
+                .replace(/`/g, '')
+                .replace(/\*\*/g, '');
+            }
+            
+            return response;
+          }
+        }
+      }
+      
+      // Return regular response if no tool calls
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm here to help with your property management needs!";
     } catch (fetchError) {
       clearTimeout(timeoutId);
       throw fetchError;
@@ -159,12 +510,12 @@ const getAIResponse = async (question: string): Promise<string> => {
   } catch (error) {
     console.error('AI Error:', error);
     
-    // Provide helpful fallback responses based on error type
+    // Concise fallback responses
     if (error.name === 'AbortError') {
-      return "I'm taking a bit too long to respond. Please try again in a moment, or ask me about your payment data which I can access directly.";
+      return "Timeout. Try again or ask about payment data.";
     }
     
-    return "I'm having trouble connecting to my AI service right now, but I can still help with questions about your payment data! Try asking about recent payments, total amounts, or payment statuses.";
+    return "AI service unavailable. I can still help with payment queries.";
   }
 };
 
@@ -205,15 +556,62 @@ const getAIResponse = async (question: string): Promise<string> => {
     return null;
   };
 
-  const clearChat = () => {
-    setMessages([
-      {
+  const clearChat = async () => {
+    if (!user || isGuest) {
+      // For guests, just reset the UI
+      const welcomeMessage = {
         id: "1",
-        content: `Hi${isGuest ? '' : `, ${userProfile?.fullName || 'there'}`}! I'm your Owners Hub assistant. I can answer questions about your app data (like payments) and help you navigate to sections such as Payments, Residents, or the Dashboard.${isGuest ? ' Note: You\'re browsing as a guest with limited access.' : ''}`,
-        sender: "bot",
+        content: `Hi! I'm your Owners Hub assistant. I can answer questions about your app data (like payments) and help you navigate to sections such as Payments, Residents, or the Dashboard. Note: You're browsing as a guest with limited access.`,
+        sender: "bot" as const,
         timestamp: new Date(),
-      },
-    ]);
+      };
+      setMessages([welcomeMessage]);
+      return;
+    }
+
+    // Confirmation dialog
+    if (!confirm("Are you sure you want to clear all chat history? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      // Delete all chats for this user from database
+      const chatsRef = collection(db, "chats");
+      const userChatsQuery = query(chatsRef, where("userId", "==", user.uid));
+      const chatsSnapshot = await getDocs(userChatsQuery);
+      
+      // Delete all messages in each chat, then delete the chat
+      for (const chatDoc of chatsSnapshot.docs) {
+        const chatId = chatDoc.id;
+        
+        // Delete all messages in this chat
+        const messagesRef = collection(db, "chats", chatId, "messages");
+        const messagesSnapshot = await getDocs(messagesRef);
+        
+        for (const messageDoc of messagesSnapshot.docs) {
+          await deleteDoc(doc(db, "chats", chatId, "messages", messageDoc.id));
+        }
+        
+        // Delete the chat document
+        await deleteDoc(doc(db, "chats", chatId));
+      }
+      
+      // Reset UI state
+      const welcomeMessage = {
+        id: "1",
+        content: `Hi, ${userProfile?.fullName || 'there'}! I'm your Owners Hub assistant. I can answer questions about your app data (like payments) and help you navigate to sections such as Payments, Residents, or the Dashboard.`,
+        sender: "bot" as const,
+        timestamp: new Date(),
+      };
+      
+      setMessages([welcomeMessage]);
+      setCurrentChatId(null);
+      
+      console.log("All chat data cleared from database");
+    } catch (error) {
+      console.error("Error clearing chat data:", error);
+      alert("Error clearing chat data. Please try again.");
+    }
   };
 
 const sendMessage = async () => {
@@ -237,6 +635,9 @@ const sendMessage = async () => {
   setInputMessage("");
   setIsLoading(true);
 
+  // Save user message to database
+  await saveMessage(userMessage);
+
   // Remove animation class after animation completes
   setTimeout(() => {
     setMessages((prev) =>
@@ -258,6 +659,9 @@ const sendMessage = async () => {
     };
 
     setMessages((prev) => [...prev, botMessage]);
+
+    // Save bot message to database
+    await saveMessage(botMessage);
 
     setTimeout(() => {
       setMessages((prev) =>
@@ -307,6 +711,9 @@ const sendMessage = async () => {
     "How many payments are recorded?",
     "What is the total amount collected?",
     "What is the status of John Smith's payment?",
+    "Show me all residents",
+    "Find properties with status active",
+    "Get payment details for customer John",
     "Open Payments",
     "Open Residents",
     "Open Dashboard"
@@ -399,6 +806,14 @@ const maybeNavigate = (text: string): boolean => {
         <Card className="flex-1 mb-2 sm:mb-4 overflow-hidden shadow-xl border-border/50 backdrop-blur-sm bg-background/95 animate-scale-in min-h-0">
           <CardContent className="p-0 h-full flex flex-col">
             <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-6 scroll-smooth overscroll-contain mobile-scroll">
+              {isLoadingChat && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Loading chat history...</span>
+                  </div>
+                </div>
+              )}
               {messages.map((message, index) => (
                 <div
                   key={message.id}

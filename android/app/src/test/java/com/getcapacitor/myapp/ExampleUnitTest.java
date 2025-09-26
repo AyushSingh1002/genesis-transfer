@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package com.coliv.manager;
 
 import static org.junit.Assert.*;
 
