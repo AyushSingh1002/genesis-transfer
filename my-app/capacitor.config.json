@@ -1,5 +1,5 @@
 {
-  "appId": "com.coliv.manager.app",
+  "appId": "com.coliv.manager",
   "appName": "CoLiv-Manager-app",
   "webDir": "dist",
   "plugins": {

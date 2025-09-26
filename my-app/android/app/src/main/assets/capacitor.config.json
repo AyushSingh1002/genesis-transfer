@@ -1,5 +1,5 @@
 {
-	"appId": "com.colivskfvr.app",
+	"appId": "com.coliv.manager",
 	"appName": "CoLiv_Manager_app",
 	"webDir": "dist",
 	"plugins": {
