@@ -36,7 +36,7 @@ const Subscription = () => {
     },
     {
       name: "Pro",
-      price: 999,
+      price: 119,
       period: "month",
       description: "For growing property portfolios",
       features: [
@@ -52,7 +52,7 @@ const Subscription = () => {
     },
     {
       name: "Enterprise",
-      price: 2999,
+      price: 179,
       period: "month",
       description: "For large-scale operations",
       features: [
@@ -88,7 +88,7 @@ const Subscription = () => {
 
       script.onload = () => {
         const options = {
-          key: 'rzp_test_VSkkDl7N8oIENZ', // Replace with your Razorpay key
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID,
           amount: plan.price * 100, // Amount in paise
           currency: 'INR',
           name: 'Owners Hub',
