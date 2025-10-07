@@ -8,14 +8,7 @@ import IssueCard from "@/components/IssueCard";
 import BottomNavigation from "@/components/BottomNavigation";
 import AddPropertyModal from "@/components/AddPropertyModal";
 import { useAuth } from "@/context/AuthContext";
-import { createClient } from "@supabase/supabase-js";
-import { db } from "@/integrations/firebase/client";
-import { collection, getDocs, query, where } from "firebase/firestore";
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
+import { dashboardAPI, issueAPI } from "@/services/api";
 
 type Status = "pending" | "in-progress" | "resolved";
 
@@ -69,25 +62,17 @@ const Dashboard = () => {
 
   const isOwner = userProfile?.role === 'owner' || isGuest;
 
-  // Fetch dashboard data from Firebase
+  // Fetch dashboard data from Backend API
   const fetchDashboardData = async () => {
     try {
       setDashboardData(prev => ({ ...prev, loading: true }));
       
-      // Fetch residents
-      const residentsRef = collection(db, 'users');
-      const residentsQuery = query(residentsRef, where("role", "==", "resident"));
-      const residentsSnapshot = await getDocs(residentsQuery);
-      const residents = residentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Fetch payments
-      const paymentsRef = collection(db, 'payments');
-      const paymentsSnapshot = await getDocs(paymentsRef);
-      const payments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Fetch data from backend API
+      const data = await dashboardAPI.getDashboardData();
       
       setDashboardData({
-        residents,
-        payments,
+        residents: data.residents || [],
+        payments: data.payments || [],
         loading: false
       });
     } catch (error) {
@@ -96,7 +81,7 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch real issues from Supabase
+  // Fetch real issues from Backend API
   useEffect(() => {
     fetchIssues();
     fetchDashboardData();
@@ -105,27 +90,25 @@ const Dashboard = () => {
   const fetchIssues = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('issues')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const response = await issueAPI.getAll();
       
-      if (error) throw error;
-      
-      if (data) {
-        // Transform Supabase data to match our interface
-        const transformedIssues = data.map(issue => ({
+      if (response && response.issues && response.issues.length > 0) {
+        // Transform backend data to match our interface
+        const transformedIssues = response.issues.map((issue: any) => ({
           id: issue.id,
-          title: issue.title,
-          priority: issue.priority,
-          reporter: issue.submitted_by,
-          date: new Date(issue.created_at).toLocaleDateString(),
+          title: issue.title || 'Untitled Issue',
+          priority: issue.priority || 'medium',
+          reporter: issue.submitted_by || issue.submittedBy || 'Unknown',
+          date: issue.created_at || issue.createdAt ? new Date(issue.created_at || issue.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
           unit: issue.unit || 'N/A',
-          description: issue.description,
-          category: issue.category,
-          status: issue.status
+          description: issue.description || 'No description',
+          category: issue.category || 'other',
+          status: issue.status || 'pending'
         }));
         setIssues(transformedIssues);
+      } else {
+        // Fall back to mock data if no issues returned
+        setIssues(mockIssues);
       }
     } catch (error) {
       console.error('Error fetching issues:', error);
@@ -138,12 +121,7 @@ const Dashboard = () => {
 
   const updateIssueStatus = async (issueId: string, newStatus: Status) => {
     try {
-      const { error } = await supabase
-        .from('issues')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', issueId);
-      
-      if (error) throw error;
+      await issueAPI.updateStatus(issueId, newStatus);
       
       // Update local state
       setIssues(prev => prev.map(issue => 
@@ -162,17 +140,17 @@ const Dashboard = () => {
     const totalProperties = residents.length || 12; // fallback to 12 if no data
     
     // Calculate occupied units (active residents)
-    const occupiedUnits = residents.filter(r => r.status === 'active').length;
+    const occupiedUnits = residents.filter((r: any) => r.status === 'active').length;
     
     // Calculate monthly revenue from payments (sum of recent payments)
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     const monthlyRevenue = payments
-      .filter(payment => {
-        const paymentDate = payment.created_at ? new Date(payment.created_at.toDate ? payment.created_at.toDate() : payment.created_at) : new Date();
+      .filter((payment: any) => {
+        const paymentDate = payment.created_at ? new Date(payment.created_at) : new Date();
         return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
       })
-      .reduce((sum, payment) => sum + (parseFloat(payment.amount) || 0), 0);
+      .reduce((sum: number, payment: any) => sum + (parseFloat(payment.amount) || 0), 0);
     
     // Calculate occupancy rate
     const occupancyRate = totalProperties > 0 ? Math.round((occupiedUnits / totalProperties) * 100) : 0;

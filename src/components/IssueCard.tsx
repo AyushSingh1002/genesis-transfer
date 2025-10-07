@@ -93,19 +93,19 @@ const IssueCard = ({ issue, onStatusChange }: IssueCardProps) => {
             {issue.category}
           </Badge>
           <div className="flex items-center gap-2">
-            <Badge className={statusColors[issue.status]}>
+            <Badge className={statusColors[issue.status || 'pending']}>
               <div className="flex items-center gap-1">
-                {getStatusIcon(issue.status)}
-                {issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
+                {getStatusIcon(issue.status || 'pending')}
+                {issue.status ? issue.status.charAt(0).toUpperCase() + issue.status.slice(1) : 'Pending'}
               </div>
             </Badge>
             {onStatusChange && issue.status !== 'resolved' && (
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onStatusChange(issue.id, getNextStatus(issue.status) as "pending" | "in-progress" | "resolved")}
+                onClick={() => onStatusChange(issue.id, getNextStatus(issue.status || 'pending') as "pending" | "in-progress" | "resolved")}
               >
-                {getStatusActionText(issue.status)}
+                {getStatusActionText(issue.status || 'pending')}
               </Button>
             )}
             {onStatusChange && issue.status === 'resolved' && (

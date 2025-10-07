@@ -6,9 +6,8 @@ import { Plus, Users, Phone, Mail, MapPin, Calendar, Loader2 } from "lucide-reac
 import Header from "@/components/Header";
 import BottomNavigation from "@/components/BottomNavigation";
 import AddResidentModal from "@/components/AddResidentModal";
-import { db } from "@/integrations/firebase/client";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { userAPI } from "@/services/api";
 
 interface Resident {
   id: string;
@@ -36,15 +35,12 @@ const Residents = () => {
       
       try {
         setLoading(true);
-        const usersRef = collection(db, 'users');
-        // Simplified query to avoid composite index requirement
-        const q = query(usersRef, where("role", "==", "resident"));
-        const snapshot = await getDocs(q);
+        const response = await userAPI.getAll({ role: 'resident' });
+        const docs = response.users || [];
         
-        const fetchedResidents: Resident[] = snapshot.docs.map(doc => {
-          const data = doc.data();
+        const fetchedResidents: Resident[] = docs.map((data: any) => {
           return {
-            id: doc.id,
+            id: data.id,
             name: data.fullName || 'Unknown Resident',
             fullName: data.fullName || 'Unknown Resident',
             email: data.email || '',

@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Loader2 } from "lucide-react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import Header from "@/components/Header";
 import BottomNavigation from "@/components/BottomNavigation";
+import { paymentAPI } from "@/services/api";
 
 interface Payment {
   id: string;
@@ -38,12 +37,10 @@ const Payments = () => {
 
   const fetchPayments = async () => {
     try {
-      const paymentsRef = collection(db, "payments");
-      const q = query(paymentsRef, orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as any[];
+      const response = await paymentAPI.getAll();
+      const docs = response.payments || [];
 
-      const transformedPayments: PaymentDisplay[] = (docs || []).map((payment: any) => {
+      const transformedPayments: PaymentDisplay[] = docs.map((payment: any) => {
         const createdAt = payment.created_at ? new Date(payment.created_at) : new Date();
         return {
           id: payment.id,
