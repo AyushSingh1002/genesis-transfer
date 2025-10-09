@@ -23,3 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 *.env
+
+# Firebase Configuration Files (contain API keys)
+google-services.json
+GoogleService-Info.plist
+android/app/google-services.json
+ios/App/GoogleService-Info.plist
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production

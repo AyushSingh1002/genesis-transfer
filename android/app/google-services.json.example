@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "587592082463",
-    "project_id": "cohub-help-desk-b2a66",
-    "storage_bucket": "cohub-help-desk-b2a66.firebasestorage.app"
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT_ID.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:587592082463:android:f9c907b1a4b1710fb5e12a",
+        "mobilesdk_app_id": "YOUR_MOBILE_SDK_APP_ID",
         "android_client_info": {
           "package_name": "com.coliv.manager"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBxxn3DysMJJ49U-fPE6nrleoUmIhoAEac"
+          "current_key": "YOUR_API_KEY_HERE"
         }
       ],
       "services": {
@@ -27,3 +27,4 @@
   ],
   "configuration_version": "1"
 }
+
