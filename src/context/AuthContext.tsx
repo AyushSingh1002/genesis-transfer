@@ -6,10 +6,11 @@ import {
   signOut,
   onAuthStateChanged,
   signInAnonymously,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  deleteUser
 } from 'firebase/auth';
 import { auth, db } from '@/integrations/firebase/client';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -20,6 +21,7 @@ interface AuthContextType {
   signInAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   userProfile: UserProfile | null;
 }
 
@@ -110,6 +112,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(null);
   };
 
+  const deleteAccount = async () => {
+    if (!user) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      // Delete user document from Firestore if not anonymous
+      if (!user.isAnonymous && user.uid) {
+        await deleteDoc(doc(db, 'users', user.uid));
+      }
+
+      // Delete user from Firebase Auth
+      await deleteUser(user);
+      
+      // Clear user profile state
+      setUserProfile(null);
+    } catch (error: any) {
+      // If re-authentication is required, throw a specific error
+      if (error.code === 'auth/requires-recent-login') {
+        throw new Error('For security reasons, please log out and log back in before deleting your account.');
+      }
+      throw error;
+    }
+  };
+
   // If there's an auth error, show a fallback
   if (authError) {
     return <div>Authentication Error: {authError}</div>;
@@ -124,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInAsGuest,
     resetPassword,
     logout,
+    deleteAccount,
     userProfile,
   };
 
